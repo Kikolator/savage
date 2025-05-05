@@ -1,0 +1,18 @@
+{
+  "projects": {
+    "default": "savage-coworking"
+  },
+  "targets": {
+    "savage-coworking": {
+      "hosting": {
+        "qr": [
+          "savage-coworking-qr"
+        ],
+        "api": [
+          "api-savage-coworking"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

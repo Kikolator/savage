@@ -1,0 +1,52 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  font-family: Arial, sans-serif;
+  background-color: #9bcd8a; /* Secondary color as background */
+  color: #13191e; /* Text color */
+}
+
+.container {
+  text-align: center;
+  max-width: 600px;
+  padding: 30px;
+  background-color: #ffffff; /* White background for contrast */
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); /* Light shadow for depth */
+}
+
+h1 {
+  font-size: 2.5em;
+  color: #1e3f37; /* Primary color for the heading */
+}
+
+p {
+  margin-top: 10px;
+  font-size: 1.2em;
+  color: #13191e; /* Text color */
+}
+
+.button {
+  display: inline-block;
+  margin-top: 20px;
+  padding: 10px 20px;
+  font-size: 1em;
+  color: #ffffff; /* White text for contrast */
+  background-color: #4e9f83; /* Accent color for button */
+  text-decoration: none;
+  border-radius: 5px;
+  transition: background-color 0.3s, transform 0.1s ease;
+}
+
+.button:hover {
+  background-color: #1e3f37; /* Primary color on hover */
+  transform: scale(1.05); /* Slightly enlarge on hover */
+}

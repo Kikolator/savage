@@ -1,0 +1,33 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "bookings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "type",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "member_data",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "member_visible",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "membership_status",
+          "order": "DESCENDING"
+        }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

@@ -1,0 +1,68 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // true if user is signed in
+    function signedIn() {
+      return request.auth.uid != null;
+    }
+    // true if user is client
+    function isClient() {
+      return request.auth.token.client == true;
+    }
+    // true if user is admin
+    function isAdmin() {
+      return request.auth.token.admin == true;
+    }
+    // true if user is owner
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    allow write: if isAdmin();
+    allow read: if isAdmin();
+
+    // Users collection allows write/read by owner and admin
+    match /users/{uid} {
+      allow write: if signedIn() && isOwner(uid) || isAdmin();
+      allow read: if signedIn() && isOwner(uid) || isAdmin();
+    }
+
+    // Member data can be written by owner and read by authenticated users
+    match /member_data/{document} {
+      allow create: if isOwner(request.resource.data.uid) || isAdmin();
+      allow update: if isOwner(resource.data.uid)
+        && request.resource.data.uid == resource.data.uid;
+      allow read: if signedIn();
+    }
+
+    // Meeting Rooms and Desks can be written by admin, and read by authenticated users
+    match /meeting_rooms/{document} {
+      allow write: if isAdmin();
+      allow read: if signedIn();
+    }
+    match /desks/{document} {
+      allow write: if isAdmin();
+      allow read: if signedIn();
+    }
+
+    // checked in out sessions can be written and read by owner
+    match /check_in_out_sessions/{document} {
+      allow write: if isOwner(request.resource.data.uid) || isAdmin();
+      allow read: if isOwner(resource.data.uid) || isAdmin();
+    }
+
+    // Bookings can be written and read by owner
+    match /bookings/{document} {
+      allow create: if isOwner(request.resource.data.member_id) 
+        && isClient() 
+        || isAdmin();
+      allow update: if isOwner(request.resource.data.member_id) 
+        && isClient() 
+        || isAdmin();
+      allow delete: if isAdmin();
+      allow get: if isOwner(resource.data.member_id) || isAdmin();
+      allow list: if signedIn();
+    }
+  }
+}

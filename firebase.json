@@ -1,0 +1,132 @@
+{
+  "hosting": [
+    {
+      "target": "api",
+      "public": "frontend/api",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "**",
+          "function": {
+            "functionId": "api",
+            "pinTag": true
+          }
+        }
+      ]
+    },
+    {
+      "target": "qr",
+      "public": "frontend/qr",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "redirects": [
+        {
+          "source": "/",
+          "destination": "https://savage-coworking.com/",
+          "type": 301
+        },
+        {
+          "source": "/2kHLrT",
+          "destination": "https://savage-coworking.com/",
+          "type": 302
+        },
+        {
+          "source": "/4x7PQ2",
+          "destination": "https://savage-coworking.com/es",
+          "type": 302
+        },
+        {
+          "source": "/Z4R9TQ",
+          "destination": "https://savage-coworking.com/",
+          "type": 302
+        },
+        {
+          "source": "/H4K5ZQ",
+          "destination": "https://instagram.com/savagecoworking",
+          "type": 302
+        },
+        {
+          "source": "/W3P7XQ",
+          "destination": "https://instagram.com/savagecoworking",
+          "type": 302
+        },
+        {
+          "source": "/a9B3Zd",
+          "destination": "https://instagram.com/savagecoworking",
+          "type": 302
+        },
+        {
+          "source": "/A7B2D9",
+          "destination": "https://instagram.com/savagecoworking",
+          "type": 302
+        },
+        {
+          "source": "/B7aD1c",
+          "destination": "https://savage-coworking.com/trial-day",
+          "type": 302
+        },
+        {
+          "source": "/INAURSVP",
+          "destination": "https://savage-coworking.com/opening-rsvp",
+          "type": 302
+        },
+        {
+          "source": "/BRAC112",
+          "destination": "https://savage-coworking.com/",
+          "type": 302
+        },
+        {
+          "source": "/**",
+          "destination": "https://savage-coworking.com/",
+          "type": 301
+        }
+      ]
+    }
+  ],
+  "firestore": {
+    "rules": "infra/firebase/firestore.rules",
+    "indexes": "infra/firebase/firestore.indexes.json"
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ],
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run lint",
+        "npm --prefix \"$RESOURCE_DIR\" run build"
+      ]
+    }
+  ],
+  "emulators": {
+    "functions": {
+      "port": 5010
+    },
+    "ui": {
+      "enabled": true
+    },
+    "singleProjectMode": true,
+    "firestore": {
+      "port": 8080
+    },
+    "hosting": {
+      "port": 5050
+    },
+    "pubsub": {
+      "port": 8085
+    }
+  }
+}
