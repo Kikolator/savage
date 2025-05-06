@@ -1,9 +1,9 @@
-import { defineSecret } from "firebase-functions/params";
+import { defineSecret } from 'firebase-functions/params';
 
 interface FirebaseSecrets {
-    sendgridApiKey: ReturnType<typeof defineSecret>;
-  }
+  sendgridApiKey: ReturnType<typeof defineSecret>;
+}
 
 export const firebaseSecrets: FirebaseSecrets = {
-    sendgridApiKey: defineSecret('SENDGRID_API_KEY'),
-  };
+  sendgridApiKey: defineSecret('SENDGRID_API_KEY'),
+};

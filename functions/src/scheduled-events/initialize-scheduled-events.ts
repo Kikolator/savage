@@ -1,4 +1,4 @@
-import { ScheduleFunction } from "firebase-functions/v2/scheduler";
+import { ScheduleFunction } from 'firebase-functions/v2/scheduler';
 
 
 export type ScheduledV2Function = {

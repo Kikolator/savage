@@ -1,5 +1,5 @@
 export interface SendgridCustomField {
     id: string,
-    name: string, 
+    name: string,
     type: string,
 }

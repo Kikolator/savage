@@ -1,4 +1,4 @@
-import { DocumentData } from "firebase-admin/firestore";
+import { DocumentData } from 'firebase-admin/firestore';
 
 export interface CreateDoc {
     data: DocumentData,

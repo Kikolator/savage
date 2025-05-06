@@ -61,8 +61,8 @@ module.exports = {
       'ignoreTemplateLiterals': true,
       'ignoreRegExpLiterals': true,
       'ignoreComments': true,
-      'ignoreImportStatements': true,
+      // 'ignoreImportStatements': true,
     }],
-    'import/newline-after-import': ['error', 'always'],
+    // 'import/newline-after-import': ['error', 'always'],
   },
 };
