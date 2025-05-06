@@ -9,6 +9,7 @@ import { SendgridService } from '../../core/services/sendgrid-service';
 import { FirestoreService } from '../../core/services/firestore-service';
 import { firebaseSecrets } from '../../core/config/firebase-secrets';
 import { isDevelopment } from '../../core/utils/environment';
+import { mainConfig } from '../../core/config/main-config';
 
 export class SendgridScheduledEvents implements InitializeScheduledEvents {
   initialize(add: AddScheduledEvent): void {
@@ -22,7 +23,7 @@ export class SendgridScheduledEvents implements InitializeScheduledEvents {
     name: 'updateSendgrid',
     handler: onSchedule(
       {
-        region: 'europe-west1',
+        region: mainConfig.cloudFunctionsLocation,
         secrets: [firebaseSecrets.sendgridApiKey],
         schedule: 'every 24 hours',
       }, async () => {
