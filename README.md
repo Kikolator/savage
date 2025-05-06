@@ -2,7 +2,7 @@
 
 Git Branches:
 - main: latest deploy (production) **v0.1**
-- dev: development area
+- dev: development area **v0.2**
 
 We move dev changes to main by merging branches (don't rebase).  
 ```bash
