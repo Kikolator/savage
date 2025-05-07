@@ -2,6 +2,15 @@
 
 ## API
 
+API calls are structured according to express app practices with a little bit of extra sauce to handle errors, and use an API versioning implementation. Herre is the basic setup:
+1. After initializing our express app, as you normally do, we initialize a new HttpServer class which handles the calls and error handling.
+2. We then iterate over interceptors to use as global midleware, adding them to our app.
+3. Our HttpServer allows us to create a new versioned router, which we can then use to initialise a new versioned HttpServer, and run version specific middleware.
+4. We initiate our controllers for each version handling CRUD logic.
+Check out the index file [HERE](../functions/src/api/index.ts)
+
+To check out v1 endpoint refer to the [API documentation](./API_V1.md).
+
 - [ ] TODO: Create a webhook for typeform submissions.
 
 ## Scheduled
