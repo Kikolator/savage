@@ -65,12 +65,15 @@ class TypeformController implements Controller {
     data: TypeformResponse
   ): Promise<void> {
     logger.debug('TypeformController.handleTrialDayForm: handling trial day form', {
-      data,
+      eventId: data.event_id,
     });
     // parse the form data
     const formData = parseTypeformResponse<TrialDayFormData>(
       data,
       TYPEFORM_IDS.TRIAL_DAY);
+    logger.debug('TypeformController.handleTrialDayForm: parsed form data', {
+      formData,
+    });
 
     // TODO check availability logic.
     // TODO approve/reschedule/deny.

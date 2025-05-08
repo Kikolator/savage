@@ -8,4 +8,13 @@ export interface TrialDayFormData {
     phoneNumber: string;
     email: string;
     legal: boolean;
+    submittedAt: string;
+    timezone?: string;
+    referralEmail?: string;
+    hiddenEmail?: string;
+    hiddenFirstName?: string;
+    hiddenLastName?: string;
+    userId?: string;
+    utmCampaign?: string;
+    utmSource?: string;
 }

@@ -5,15 +5,18 @@ import { TrialDayFormData } from '../../../core/data/models';
 export type TypeformTypes = TrialDayFormData; // Add more form types here with union |
 
 interface TypeformMapping<T extends TypeformTypes> {
-    formId: string;
-    formType: T;
-    fieldMappings: Record<keyof T, string>;
-  }
+  formId: string;
+  formType: T;
+  submittedAt: string;
+  fieldMappings: Record<keyof T, string>;
+  hiddenFieldMappings?: Record< keyof T, string>;
+}
 
 const typeformMappings: TypeformMapping<TypeformTypes>[] = [
   {
     formId: TYPEFORM_IDS.TRIAL_DAY,
-    formType: {} as TrialDayFormData, // Type marker, not used at runtime
+    formType: {} as TrialDayFormData,
+    submittedAt: 'none',
     fieldMappings: {
       preferredDate: 'xX6TSIEnqNkj',
       preferredTime: '2f1qDhLbEreM',
@@ -25,6 +28,16 @@ const typeformMappings: TypeformMapping<TypeformTypes>[] = [
       email: 'pgTkoA9mDEAT',
       legal: 'mm48WXKiBVWg',
     } as Record<keyof TrialDayFormData, string>,
+    hiddenFieldMappings: {
+      hiddenEmail: 'email',
+      hiddenFirstName: 'first_name',
+      hiddenLastName: 'last_name',
+      referralEmail: 'referral_email',
+      timezone: 'timezone',
+      userId: 'user_id',
+      utmCampaign: 'utm_campaign',
+      utmSource: 'utm_source',
+    } as Record<keyof TrialDayFormData, string>,
   },
 ];
 
@@ -32,6 +45,6 @@ export function getTypeformMapping<T extends TypeformTypes>(
   formId: string
 ): TypeformMapping<T> | undefined {
   return typeformMappings.find(
-    (mapping): mapping is TypeformMapping<T> => mapping.formId === formId
-  );
+    (mapping) => mapping.formId === formId
+  ) as TypeformMapping<T> | undefined;
 }
