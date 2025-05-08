@@ -5,6 +5,7 @@ import { logger } from 'firebase-functions';
 import { onRequest } from 'firebase-functions/v2/https';
 import { mainConfig } from './core/config/main-config';
 import apiApp from './api';
+import { firebaseSecrets } from './core/config/firebase-secrets';
 
 // Set timezone to Madrid
 process.env.TZ = 'Europe/Madrid';
@@ -22,7 +23,9 @@ if (isDevelopment()) {
 exports.api = onRequest(
   {
     region: mainConfig.cloudFunctionsLocation,
-    secrets: [],
+    secrets: [
+      firebaseSecrets.typeformSecretKey,
+    ],
   },
   apiApp,
 );

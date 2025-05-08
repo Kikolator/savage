@@ -1,5 +1,6 @@
 import { Client } from '@sendgrid/client';
 import {
+  SendgridContactRequest,
   SendgridCustomField,
   SendgridCustomFieldResponse,
   SendgridList,
@@ -69,5 +70,20 @@ export class SendgridService {
     });
 
     return lists;
+  }
+
+  public async addContact(contact: SendgridContactRequest): Promise<string> {
+    logger.info('SendgridService.addContact()- Adding contact');
+    const request: ClientRequest = {
+      url: '/v3/marketing/contacts',
+      method: 'PUT',
+      body: contact,
+    };
+    const [response, body] = await this.client.request(request);
+    if (response.statusCode !== 202) {
+      throw new Error(`Error adding Sendgrid contact: ${response.statusCode} ${response.body}`);
+    }
+
+    return body;
   }
 }

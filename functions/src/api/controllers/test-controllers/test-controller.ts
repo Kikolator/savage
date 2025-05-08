@@ -26,4 +26,4 @@ class TestController implements Controller {
   };
 }
 
-export { TestController };
+export default TestController;
