@@ -1,5 +1,8 @@
 # Savage Coworking Backend Functions
 
+!! TIMEZONE !! All dates are converted to UTC. If no timezone parameter is set in the 
+request, we will assume it's UTC.
+
 ## API
 
 API calls are structured according to express app practices with a little bit of extra sauce to handle errors, and use an API versioning implementation. Herre is the basic setup:
@@ -30,3 +33,21 @@ For config variables use the mainConfig map.
 
 We use Firebase Secrets for env keys and secret values.
 - Parameterized configuration (recommended for most scenarios). This provides strongly-typed environment configuration with parameters that are validated at deploy time, which prevents errors and simplifies debugging.
+To add a secret:
+```bash
+# Change the value of an existing secret
+firebase functions:secrets:set SECRET_NAME
+
+# View the value of a secret
+functions:secrets:access SECRET_NAME
+
+# Destroy a secret
+functions:secrets:destroy SECRET_NAME
+
+# View all secret versions and their state
+functions:secrets:get SECRET_NAME
+
+# Automatically clean up all secrets that aren't referenced by any of your functions
+functions:secrets:prune
+```
+
