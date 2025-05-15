@@ -1,12 +1,16 @@
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import {
+  getFirestore,
+  FieldValue,
+  Firestore,
+} from 'firebase-admin/firestore';
 import { CreateDoc, SetDoc, UpdateDoc } from '../data/models';
 
 export class FirestoreService {
-  private readonly db;
+  private db: Firestore | null = null;
   private static instance: FirestoreService;
 
   private constructor() {
-    this.db = getFirestore();
+    // Empty constructor, initialization will happen lazily.
   }
 
   public static getInstance(): FirestoreService {
@@ -16,14 +20,22 @@ export class FirestoreService {
     return FirestoreService.instance;
   }
 
+  private getDb(): Firestore {
+    if (!this.db) {
+      this.db = getFirestore();
+    }
+    return this.db;
+  }
+
   // Create a document in firestore
   // If the document exists, it will fail.
   public async createDocument(data: CreateDoc) {
+    const db = this.getDb();
     let docRef;
     if (!data.documentId) {
-      docRef = this.db.collection(data.collection).doc();
+      docRef = db.collection(data.collection).doc();
     } else {
-      docRef = this.db.collection(data.collection).doc(data.documentId);
+      docRef = db.collection(data.collection).doc(data.documentId);
     }
     await docRef.create({
       ...data.data,
@@ -36,7 +48,8 @@ export class FirestoreService {
   // If documentId is provided, updates the document with the given id
   // If document does not exist fails.
   public async updateDocument(data: UpdateDoc) {
-    const docRef = this.db.collection(data.collection).doc(data.documentId);
+    const db = this.getDb();
+    const docRef = db.collection(data.collection).doc(data.documentId);
     await docRef.update({
       ...data.data,
       updated_at: FieldValue.serverTimestamp(),
@@ -49,11 +62,12 @@ export class FirestoreService {
   // If merge is true, only the provided fields will be updated, otherwise the entire document will be overwritten.
   // By default merge is true.
   public async setDocument(data: SetDoc) {
+    const db = this.getDb();
     let docRef;
     if (!data.documentId) {
-      docRef = this.db.collection(data.collection).doc();
+      docRef = db.collection(data.collection).doc();
     } else {
-      docRef = this.db.collection(data.collection).doc(data.documentId);
+      docRef = db.collection(data.collection).doc(data.documentId);
     }
     await docRef.set({
       ...data.data,

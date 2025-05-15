@@ -5,7 +5,6 @@ import {
   ScheduledV2Function,
 } from '../initialize-scheduled-events';
 import { mainConfig } from '../../core/config/main-config';
-import { officeRndConfig } from '../../core/config/office-rnd-config';
 import { firebaseSecrets } from '../../core/config/firebase-secrets';
 import OfficeRndService from '../../core/services/office-rnd-service';
 import { FirestoreService } from '../../core/services/firestore-service';

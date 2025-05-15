@@ -1,5 +1,5 @@
 import { RequestHandler, Request } from 'express';
-import { AppError, Controller, HttpServer } from '..';
+import { Controller, HttpServer } from '..';
 // import { FirestoreService } from '../../../core/services/firestore-service';
 import { TYPEFORM_IDS } from '../../../core/config/typeform-ids';
 import * as crypto from 'crypto';
@@ -7,21 +7,24 @@ import { firebaseSecrets } from '../../../core/config/firebase-secrets';
 import { TrialDayFormData, TypeformResponse } from '../../../core/data/models';
 import { parseTypeformResponse } from './typeform-parser';
 import { logger } from 'firebase-functions';
+import { TrialdayService } from '../../../core/services/trialday-service';
+import { AppError, ErrorCode } from '../../../core/errors/app-error';
 
 class TypeformController implements Controller {
-//   private readonly firestoreService: FirestoreService;
-  private readonly formHandlers: Map<
-    string, (data: TypeformResponse) => Promise<void>>;
+  constructor(
+    private readonly params: {
+      trialdayService: TrialdayService;
+    }
+  ) {}
 
-  constructor() {
-    // this.firestoreService = FirestoreService.getInstance();
-    this.formHandlers = new Map([
-      [TYPEFORM_IDS.TRIAL_DAY, this.handleTrialDayForm.bind(this)],
-    ]);
-  }
   initialize(httpServer: HttpServer): void {
     httpServer.post('/webhook/typeform', this.handleWebhook.bind(this));
   }
+
+  private static readonly formHandlers: Map<
+    string, (data: TypeformResponse) => Promise<void>> = new Map([
+      [TYPEFORM_IDS.TRIAL_DAY, TypeformController.prototype.handleTrialDayForm],
+    ]);
 
   private handleWebhook: RequestHandler = async (
     request,
@@ -37,15 +40,15 @@ class TypeformController implements Controller {
 
     // validate data
     if (!typeformData.form_response?.form_id) {
-      throw new AppError('Invalid Typeform webhook data', 400);
+      throw new AppError('Invalid Typeform webhook data', ErrorCode.TYPEFORM_WEBHOOK_INVALID_DATA);
     }
 
     // get the handler for the form
     const formId = typeformData.form_response.form_id;
-    const formHandler = this.formHandlers.get(formId);
+    const formHandler = TypeformController.formHandlers.get(formId);
 
     if (!formHandler) {
-      throw new AppError(`No handler found for form_id: ${formId}`);
+      throw new AppError(`No handler found for form_id: ${formId}`, ErrorCode.TYPEFORM_WEBHOOK_NO_HANDLER_FOUND);
     }
 
     // Authentication successful - send 200 response
@@ -58,35 +61,29 @@ class TypeformController implements Controller {
         formId: typeformData.form_response.form_id,
         eventId: typeformData.event_id,
       });
+      next(error);
     });
+    next();
   };
 
   private async handleTrialDayForm(
     data: TypeformResponse
   ): Promise<void> {
-    logger.debug('TypeformController.handleTrialDayForm: handling trial day form', {
+    logger.info('TypeformController.handleTrialDayForm: handling trial day form', {
       eventId: data.event_id,
     });
     // parse the form data
     const formData = parseTypeformResponse<TrialDayFormData>(
       data,
       TYPEFORM_IDS.TRIAL_DAY);
-    logger.debug('TypeformController.handleTrialDayForm: parsed form data', {
-      formData,
-    });
 
-    // TODO check availability logic.
-    // TODO approve/reschedule/deny.
-    // TODO send email confirmation.
-    // TODO Add to Google Cal.
-    // TODO book a desk in office rnd
-    throw new AppError('unimplemented', 500);
+    await this.params.trialdayService.handleTrialdayRequest(formData);
   }
 
   private verifyTypeformSignature(request: Request): void {
     const signature = request.typeformSignature;
     if (!signature) {
-      throw new AppError('invalid typeform signature', 401);
+      throw new AppError('No signature found in request', ErrorCode.TYPEFORM_WEBHOOK_INVALID_SIGNATURE, 401);
     }
     const secret = firebaseSecrets.typeformSecretKey.value();
     const payload = request.body.toString();
@@ -95,7 +92,7 @@ class TypeformController implements Controller {
       .update(payload)
       .digest('base64');
     if (signature !== `sha256=${hash}`) {
-      throw new AppError('invalid typeform signature', 401);
+      throw new AppError('invalid signature', ErrorCode.TYPEFORM_WEBHOOK_INVALID_SIGNATURE, 401);
     }
     return;
   }

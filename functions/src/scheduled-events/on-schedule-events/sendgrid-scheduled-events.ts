@@ -30,9 +30,7 @@ export class SendgridScheduledEvents implements InitializeScheduledEvents {
         try {
           logger.info('SendgridScheduledEvents.updateSendgrid()- Updating custom fields');
           // init new services
-          const sendgridService = SendgridService.getInstance(
-            firebaseSecrets.sendgridApiKey.value()
-          );
+          const sendgridService = SendgridService.getInstance();
           const firestoreService = FirestoreService.getInstance();
           // get the latest custom fields
           const customFields = await sendgridService.getCustomFields();

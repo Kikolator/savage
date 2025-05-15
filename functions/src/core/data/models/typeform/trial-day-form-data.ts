@@ -1,4 +1,6 @@
 export interface TrialDayFormData {
+    formId: string;
+    eventId: string;
     preferredDate: string;
     preferredTime: string;
     interest: Array<string>

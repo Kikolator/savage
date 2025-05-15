@@ -14,3 +14,6 @@ export * from './firestore/create-doc';
 export * from './typeform/typeform-response';
 export * from './typeform/typeform-answer';
 export * from './typeform/trial-day-form-data';
+
+// Office RnD
+export * from './office-rnd/office-rnd-member';

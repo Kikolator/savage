@@ -1,5 +1,6 @@
 import { RequestHandler } from 'express';
-import { AppError, Controller, HttpServer } from '../index';
+import { Controller, HttpServer } from '../index';
+import { AppError, ErrorCode } from '../../../core/errors/app-error';
 
 class TestController implements Controller {
   initialize(httpServer: HttpServer): void {
@@ -18,8 +19,7 @@ class TestController implements Controller {
         const appError = error as AppError;
         next(appError);
       } else {
-        const genericError = new Error('Internal Server Error') as AppError;
-        genericError.status = 500;
+        const genericError = new AppError('Internal Server Error', ErrorCode.UNKNOWN_ERROR, 500);
         next(genericError);
       }
     }

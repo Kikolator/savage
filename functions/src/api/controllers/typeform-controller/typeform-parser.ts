@@ -68,7 +68,7 @@ export const parseTypeformResponse = <T extends TypeformTypes>(
   response: TypeformResponse,
   formId: string
 ): T => {
-  logger.debug('parseTypeformResponse: parsing typeform response', {
+  logger.info('parseTypeformResponse()- parsing typeform response', {
     eventId: response.event_id,
     formId: formId,
   });
@@ -81,49 +81,19 @@ export const parseTypeformResponse = <T extends TypeformTypes>(
   const result = {} as T;
 
   // Add hidden fields from the response if they exist in the form type
-  logger.debug('parseTypeformResponse: adding hidden fields', {
-    hidden: response.form_response.hidden,
-    hiddenMapping: mapping.hiddenFieldMappings,
-  });
   if (response.form_response.hidden && mapping.hiddenFieldMappings) {
     const hiddenMapping = mapping.hiddenFieldMappings;
     const hidden = response.form_response.hidden;
-    logger.debug('parseTypeformResponse: hidden fields debug', {
-      hidden,
-      hiddenMapping,
-      resultKeys: Object.keys(result),
-      hiddenMappingKeys: Object.keys(hiddenMapping),
-    });
     for (const [resultKey, hiddenKey] of Object.entries(hiddenMapping)) {
-      logger.debug('parseTypeformResponse: checking hidden field', {
-        resultKey,
-        hiddenKey,
-        hasHiddenValue: Boolean(hidden[hiddenKey]),
-        hiddenValue: hidden[hiddenKey],
-        isInHiddenMapping: resultKey in hiddenMapping,
-        hiddenMappingKeys: Object.keys(hiddenMapping),
-      });
       if (hidden[hiddenKey]) {
-        logger.debug('parseTypeformResponse: adding hidden field', {
-          resultKey,
-          hiddenKey,
-          hiddenValue: hidden[hiddenKey],
-          result,
-        });
         const typedKey = resultKey as keyof T;
         (result[typedKey] as unknown) = hidden[hiddenKey];
-        logger.debug('parseTypeformResponse: added hidden field', {
-          result,
-        });
       }
     }
   }
 
   // Add submitted_at timestamp if it exists in the form type
   if (response.form_response.submitted_at && 'submittedAt' in mapping) {
-    logger.debug('parseTypeformResponse: adding submitted_at', {
-      submittedAt: response.form_response.submitted_at,
-    });
     (result.submittedAt as unknown) = response.form_response.submitted_at;
   }
 

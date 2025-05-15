@@ -1,18 +1,9 @@
 import { RequestHandler, Router } from 'express';
 import { logger } from 'firebase-functions';
+import { AppError } from '../../core/errors/app-error';
 
 export interface Controller {
     initialize(httpServer: HttpServer) : void;
-}
-
-export class AppError extends Error {
-  status?: number;
-
-  constructor(message: string, status?: number) {
-    super(message);
-    this.status = status;
-    this.name = 'AppError';
-  }
 }
 
 export class HttpServer {
