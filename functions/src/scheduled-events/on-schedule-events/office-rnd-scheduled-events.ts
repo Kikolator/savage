@@ -31,7 +31,7 @@ export class OfficeRndScheduledEvents implements InitializeScheduledEvents {
             firestoreService: FirestoreService.getInstance(),
           });
           await officeRndService
-            .getAndSaveToken(firebaseSecrets.officeRndSecretKey.value());
+            ._getAndSaveToken(firebaseSecrets.officeRndSecretKey.value());
         } catch (error) {
           logger.error('OfficeRndScheduledEvents.tokenGeneration()- Error getting and saving token', error);
           // add error to firestore if not in debug mode

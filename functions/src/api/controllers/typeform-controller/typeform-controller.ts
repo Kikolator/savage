@@ -11,20 +11,24 @@ import { TrialdayService } from '../../../core/services/trialday-service';
 import { AppError, ErrorCode } from '../../../core/errors/app-error';
 
 class TypeformController implements Controller {
+  private static readonly formHandlers: Map<
+    string, (data: TypeformResponse) => Promise<void>> = new Map();
+
   constructor(
     private readonly params: {
       trialdayService: TrialdayService;
     }
-  ) {}
+  ) {
+    // Bind the handlers in the constructor
+    TypeformController.formHandlers.set(
+      TYPEFORM_IDS.TRIAL_DAY,
+      this.handleTrialDayForm.bind(this)
+    );
+  }
 
   initialize(httpServer: HttpServer): void {
     httpServer.post('/webhook/typeform', this.handleWebhook.bind(this));
   }
-
-  private static readonly formHandlers: Map<
-    string, (data: TypeformResponse) => Promise<void>> = new Map([
-      [TYPEFORM_IDS.TRIAL_DAY, TypeformController.prototype.handleTrialDayForm],
-    ]);
 
   private handleWebhook: RequestHandler = async (
     request,
@@ -33,7 +37,7 @@ class TypeformController implements Controller {
   ) => {
     logger.info('TypeformController.handleWebhook: handling typeform webhook');
 
-    // First verify the typeform signature.
+    // First verify the typeform signature to ensure the request is legitimate
     this.verifyTypeformSignature(request);
 
     const typeformData = request.body as TypeformResponse;
@@ -47,12 +51,18 @@ class TypeformController implements Controller {
     const formId = typeformData.form_response.form_id;
     const formHandler = TypeformController.formHandlers.get(formId);
 
-    if (!formHandler) {
-      throw new AppError(`No handler found for form_id: ${formId}`, ErrorCode.TYPEFORM_WEBHOOK_NO_HANDLER_FOUND);
-    }
-
-    // Authentication successful - send 200 response
+    // Send 200 OK response to Typeform first
     response.status(200).send('OK');
+
+    if (!formHandler) {
+      // Log error internally but don't throw
+      logger.error('TypeformController.handleWebhook()- No handler found for form', {
+        formId,
+        eventId: typeformData.event_id,
+      });
+      // TODO add error to database
+      return;
+    }
 
     // process the form response
     formHandler(typeformData).catch((error) => {

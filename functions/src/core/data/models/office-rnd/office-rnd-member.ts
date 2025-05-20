@@ -1,3 +1,4 @@
+import { OfficeRndMemberProperties } from '..';
 import { OfficeRndMemberStatus } from '../../enums';
 
 export interface OfficeRndMember {
@@ -10,5 +11,5 @@ export interface OfficeRndMember {
     startDate: Date;
     createdAt: Date;
     modifiedAt: Date;
-    properties: Record<string, unknown>;
+    properties: OfficeRndMemberProperties;
 }

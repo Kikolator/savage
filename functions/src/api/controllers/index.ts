@@ -53,7 +53,7 @@ export class HttpServer {
       try {
         await requestHandler(req, res, next);
       } catch (error: unknown) {
-        logger.error(error);
+        logger.error('HttpServer._catchErrorHandler()-', error);
         if (error instanceof AppError) {
           res.status(error.status || 500).json({
             message: error.message,

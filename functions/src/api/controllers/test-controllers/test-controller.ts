@@ -1,6 +1,7 @@
 import { RequestHandler } from 'express';
 import { Controller, HttpServer } from '../index';
 import { AppError, ErrorCode } from '../../../core/errors/app-error';
+import { logger } from 'firebase-functions';
 
 class TestController implements Controller {
   initialize(httpServer: HttpServer): void {
@@ -10,8 +11,9 @@ class TestController implements Controller {
   // Test endpoint
   private ping: RequestHandler = async (request, response, next) => {
     try {
+      logger.debug('TestController.ping()- Pong');
       response.status(200).json({
-        message: 'Ping',
+        message: 'Pong',
       });
       next();
     } catch (error) {

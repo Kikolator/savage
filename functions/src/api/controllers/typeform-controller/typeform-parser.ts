@@ -76,10 +76,8 @@ export const parseTypeformResponse = <T extends TypeformTypes>(
   if (!mapping) {
     throw new Error(`No mapping found for form ID: ${formId}`);
   }
-
   const answers = getAnswers(response);
   const result = {} as T;
-
   // Add hidden fields from the response if they exist in the form type
   if (response.form_response.hidden && mapping.hiddenFieldMappings) {
     const hiddenMapping = mapping.hiddenFieldMappings;
@@ -151,6 +149,5 @@ export const parseTypeformResponse = <T extends TypeformTypes>(
       }
     }
   }
-
   return result;
 };
