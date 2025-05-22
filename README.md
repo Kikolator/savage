@@ -1,13 +1,14 @@
 # Savage Coworking
 
-Git Branches:
-- main: latest deploy (production) **v0.1**
-- dev: development area **v0.2**
+#### Documentation:
+- [API v1](./docs/API_V1.md)
+- [Functions](./docs/FUNCTIONS.md)
+- [Hosting](./docs/HOSTING.md)
+- [Office RnD](./docs/OFFICE_RND.md)
+- [Sendgrid](./docs/SENDGRID.md)
 
-We move dev changes to main by merging branches (don't rebase).  
-```bash
-git checkout main
-git pull origin main        # Make sure main is up to date
-git merge dev               # Merge dev into main
-git push origin main        # Push updated main to remote 
-``` 
+Git Branches:
+- main: latest deploy (production) **v0.2**
+- dev: development area
+
+Move dev changes to main by merging branches (don't rebase).  

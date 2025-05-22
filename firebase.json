@@ -13,6 +13,7 @@
           "source": "**",
           "function": {
             "functionId": "api",
+            "region": "europe-west1",
             "pinTag": true
           }
         }
