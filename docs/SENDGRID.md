@@ -18,9 +18,10 @@
 - location (e.g. “Estepona, Spain”)
 - tags (comma-separated, or use SendGrid’s native tagging if needed)
 **Membership**:
-- membership_status (active, drop-in, trial, former, lead)
+- membership_status (active, on-leave, drop-in, trial, former, lead)
 	- active when has an active recurring membership
 	- drop-in when has active day-passes
+	- on-leave when inactive but coming back within 3 months
 	- trial has had a trial day but not a membership
 	- former had a membership or was a drop-in
 	- lead has not had a trial or memerbship yet.

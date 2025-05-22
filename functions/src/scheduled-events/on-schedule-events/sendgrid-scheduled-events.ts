@@ -30,9 +30,7 @@ export class SendgridScheduledEvents implements InitializeScheduledEvents {
         try {
           logger.info('SendgridScheduledEvents.updateSendgrid()- Updating custom fields');
           // init new services
-          const sendgridService = SendgridService.getInstance(
-            firebaseSecrets.sendgridApiKey.value()
-          );
+          const sendgridService = SendgridService.getInstance();
           const firestoreService = FirestoreService.getInstance();
           // get the latest custom fields
           const customFields = await sendgridService.getCustomFields();
@@ -51,11 +49,11 @@ export class SendgridScheduledEvents implements InitializeScheduledEvents {
               merge: true,
             });
           } else {
-            logger.debug('In development mode, the custom fields and lists will not be updated in Firestore');
+            logger.debug('SendgridScheduledEvents.updateSendgrid()- In development mode, the custom fields and lists will not be updated in Firestore');
           }
           return;
         } catch (error) {
-          logger.error('Error updating custom fields', error);
+          logger.error('SendgridScheduledEvents.updateSendgrid()- Error updating custom fields', error);
           // add error to firestore if not in debug mode
           if (!isDevelopment()) {
             if (error instanceof Error) {
@@ -71,7 +69,7 @@ export class SendgridScheduledEvents implements InitializeScheduledEvents {
               return;
             }
           } else {
-            logger.debug('In development mode, the error will not be logged in Firestore');
+            logger.debug('SendgridScheduledEvents.updateSendgrid()- In development mode, the error will not be logged in Firestore');
           }
         }
       }),

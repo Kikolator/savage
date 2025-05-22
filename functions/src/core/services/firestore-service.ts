@@ -1,12 +1,19 @@
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import {
+  getFirestore,
+  FieldValue,
+  Firestore,
+  DocumentData,
+} from 'firebase-admin/firestore';
 import { CreateDoc, SetDoc, UpdateDoc } from '../data/models';
+import { AppError, ErrorCode } from '../errors/app-error';
+import { logger } from 'firebase-functions';
 
 export class FirestoreService {
-  private readonly db;
+  private db: Firestore | null = null;
   private static instance: FirestoreService;
 
   private constructor() {
-    this.db = getFirestore();
+    // Empty constructor, initialization will happen lazily.
   }
 
   public static getInstance(): FirestoreService {
@@ -16,14 +23,26 @@ export class FirestoreService {
     return FirestoreService.instance;
   }
 
+  private getDb(): Firestore {
+    if (!this.db) {
+      this.db = getFirestore();
+    }
+    return this.db;
+  }
+
   // Create a document in firestore
   // If the document exists, it will fail.
   public async createDocument(data: CreateDoc) {
+    logger.info('FirestoreService.createDocument()- creating document in Firestore.', {
+      collection: data.collection,
+      documentId: data.documentId,
+    });
+    const db = this.getDb();
     let docRef;
     if (!data.documentId) {
-      docRef = this.db.collection(data.collection).doc();
+      docRef = db.collection(data.collection).doc();
     } else {
-      docRef = this.db.collection(data.collection).doc(data.documentId);
+      docRef = db.collection(data.collection).doc(data.documentId);
     }
     await docRef.create({
       ...data.data,
@@ -36,7 +55,12 @@ export class FirestoreService {
   // If documentId is provided, updates the document with the given id
   // If document does not exist fails.
   public async updateDocument(data: UpdateDoc) {
-    const docRef = this.db.collection(data.collection).doc(data.documentId);
+    logger.info('FirestoreService.updateDocument()- updating document in Firestore.', {
+      collection: data.collection,
+      documentId: data.documentId,
+    });
+    const db = this.getDb();
+    const docRef = db.collection(data.collection).doc(data.documentId);
     await docRef.update({
       ...data.data,
       updated_at: FieldValue.serverTimestamp(),
@@ -49,15 +73,108 @@ export class FirestoreService {
   // If merge is true, only the provided fields will be updated, otherwise the entire document will be overwritten.
   // By default merge is true.
   public async setDocument(data: SetDoc) {
+    logger.info('FirestoreService.setDocument()- setting document in Firestore.', {
+      collection: data.collection,
+      documentId: data.documentId,
+      merge: data.merge,
+    });
+    const db = this.getDb();
     let docRef;
     if (!data.documentId) {
-      docRef = this.db.collection(data.collection).doc();
+      docRef = db.collection(data.collection).doc();
     } else {
-      docRef = this.db.collection(data.collection).doc(data.documentId);
+      docRef = db.collection(data.collection).doc(data.documentId);
     }
     await docRef.set({
       ...data.data,
       updated_at: FieldValue.serverTimestamp(),
     }, { merge: data.merge || true });
+  }
+
+  // Set multiple documents in a batch.
+  public async setDocuments(data: SetDoc[]) {
+    logger.info('FirestoreService.setDocuments()- setting documents in Firestore.', {
+      amount: data.length,
+      data: data,
+    });
+    const db = this.getDb();
+    const batch = db.batch();
+    data.forEach((doc) => {
+      let docRef;
+      if (!doc.documentId) {
+        docRef = db.collection(doc.collection).doc();
+      } else {
+        docRef = db.collection(doc.collection).doc(doc.documentId);
+      }
+      batch.set(docRef, {
+        ...doc.data,
+        updated_at: FieldValue.serverTimestamp(),
+      }, { merge: doc.merge || true });
+    });
+    await batch.commit();
+  }
+
+  // Gets a document from firestore
+  public async getDocument(
+    collection: string, documentId: string
+  ): Promise<DocumentData> {
+    logger.info('FirestoreService.getDocument()- getting document from Firestore.', {
+      collection: collection,
+      documentId: documentId,
+    });
+    const db = this.getDb();
+    const docRef = db.collection(collection).doc(documentId);
+    const doc = await docRef.get();
+    const data = doc.data();
+    if (!data) {
+      throw new AppError('Document not found', ErrorCode.DOCUMENT_NOT_FOUND, 404, {
+        collection: collection,
+        documentId: documentId,
+      });
+    }
+    return data;
+  }
+
+  public async getCollection(
+    collection: string,
+    isSubCollection = false,
+    documentId?: string,
+    subCollection?: string,
+  ): Promise<Array<DocumentData>> {
+    logger.info('FirestoreService.getCollection()- getting collection from Firestore.', {
+      collection: collection,
+      isSubCollection: isSubCollection,
+      documentId: documentId,
+      subCollection: subCollection,
+    });
+    const db = this.getDb();
+    if (isSubCollection) {
+      // Check documentId and subCollection are provided.
+      if (!documentId || !subCollection) {
+        throw new AppError('FirestoreService.getCollection()- documentId and subCollection are required when isSubCollection is true.', ErrorCode.VALIDATION_ERROR, 400, {
+          collection: collection,
+          documentId: documentId,
+          subCollection: subCollection,
+        });
+      }
+      const querySnapshot = await db
+        .collection(collection)
+        .doc(documentId)
+        .collection(subCollection)
+        .get();
+      const result: Array<DocumentData> = [];
+      querySnapshot.docs.map((doc) => result.push(doc.data()));
+      if (result.length === 0) {
+        throw new AppError('FirestoreService.getCollection()- collection is empty.', ErrorCode.COLLECTION_EMPTY, 404, {
+          collection: collection,
+          documentId: documentId,
+          subCollection: subCollection,
+        });
+      }
+      return result;
+    } else {
+      const querySnapshot = await db.collection(collection).get();
+      return querySnapshot.docs.map((doc) => doc.data());
+    }
   }
 }
