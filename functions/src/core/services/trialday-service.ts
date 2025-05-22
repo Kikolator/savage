@@ -13,14 +13,17 @@ import { OfficeRndMemberStatus } from '../data/enums';
 import { AppError, ErrorCode } from '../errors/app-error';
 import { officeRndConfig } from '../config/office-rnd-config';
 import { MailDataRequired } from '@sendgrid/mail';
+import { FirestoreService } from './firestore-service';
 
 export class TrialdayService {
+  private readonly trialDayRequestsCollection = 'trialDayRequests';
   // Inject dependancies
   constructor(
     private readonly params: {
       sendgridService: SendgridService,
       calendarService: GoogleCalService,
       officeService: OfficeRndService,
+      firestoreService: FirestoreService,
     }
   ) { }
 
@@ -28,6 +31,16 @@ export class TrialdayService {
     logger.info('TrialdayService.handleTrialdayRequest()- handling trialday request', {
       eventId: formData.eventId,
     });
+    // 0. Add to firestore.
+    await this.params.firestoreService.createDocument({
+      collection: this.trialDayRequestsCollection,
+      documentId: formData.eventId,
+      data: {
+        status: 'pending',
+        ...formData,
+      },
+    });
+
     // 1. Set DateTime to UTC
     // Set timezone and parse start date time
     const dateTimeString = `${formData.preferredDate} ${formData.preferredTime}`;
@@ -224,5 +237,13 @@ export class TrialdayService {
     await this.params.sendgridService.mailSend(
       mailData
     );
+
+    await this.params.firestoreService.updateDocument({
+      collection: this.trialDayRequestsCollection,
+      documentId: formData.eventId,
+      data: {
+        status: 'confirmed',
+      },
+    });
   }
 }
