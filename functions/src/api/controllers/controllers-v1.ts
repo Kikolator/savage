@@ -11,6 +11,7 @@ export const getControllersV1 = (): Array<Controller> => [
   new TestController(),
   new TypeformController({
     trialdayService: new TrialdayService({
+      firestoreService: FirestoreService.getInstance(),
       officeService: new OfficeRndService(
         { firestoreService: FirestoreService.getInstance() }),
       sendgridService: SendgridService.getInstance(),
