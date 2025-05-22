@@ -2,8 +2,6 @@ import { logger } from 'firebase-functions';
 import {
   OfficeRndMember,
   OfficeRndNewMember,
-  OfficeRndOpportunity,
-  OfficeRndOpportunityUpdate,
   TrialDayFormData,
 } from '../data/models';
 import { format, parse } from 'date-fns';
@@ -75,10 +73,8 @@ export class TrialdayService {
       await this.params.officeService.getMembersByEmail(formData.email);
     let member: OfficeRndMember;
     // Check only one member exists, and that member can book a trial day.
-    let memberExists = false;
     if (members.length == 1) {
       member = members[0];
-      memberExists = true;
       // Check member status.
       if (
         member.status !== OfficeRndMemberStatus.CONTACT &&
@@ -109,6 +105,7 @@ export class TrialdayService {
         );
       }
     } else if (members.length == 0) {
+      // No members in Array so create a new one.
       const now = new Date();
       const newMember: OfficeRndNewMember = {
         email: formData.email,
@@ -123,7 +120,6 @@ export class TrialdayService {
           reason: formData.reason,
         },
       };
-      // Create new member.
       member = await this.params.officeService.createMember(newMember);
     } else {
       // If more than one member exists with same email, throw error.
@@ -137,16 +133,16 @@ export class TrialdayService {
     }
 
     // 3. Add Opportunity to member.
-    // get the opportunity statuses.
-    const trialRequestStatus = await this
+    // get the opportunity statusses.
+    const trialRequestStatusses = await this
       .params
       .officeService
       .getOpportunityStatuses();
-    // get the trial request status id.
-    const trialRequestStatusId = trialRequestStatus.find(
+    // get the trial request status.
+    const trialRequestStatus = trialRequestStatusses.find(
       (status) => status._id === '682200cd47119167b0c24e9a'
-    )?._id;
-    if (!trialRequestStatusId) {
+    );
+    if (!trialRequestStatus) {
       throw new AppError(
         'TrialdayService.handleTrialdayRequest()- Trial Request status not found.',
         ErrorCode.TRIALDAY_STATUS_NOT_FOUND,
@@ -154,80 +150,62 @@ export class TrialdayService {
         { memberEmail: formData.email },
       );
     }
-    // TODO handle opportunites for members. Do we update or create?
-    // When we update we cannot change the probability?
+    // Because we cannot update the opportunity probability,
+    // We'll create a new oppportuntiy for each request,
+    // this way we'll also retain data.
+    // TODO add requested plans to opportunity.
+    await this.params.officeService.createOpportunity({
+      name: `${formData.firstName} ${formData.lastName} - TRIAL DAY`,
+      member: member._id,
+      status: trialRequestStatus._id,
+      probability: trialRequestStatus.probability,
+      startDate: serverStartDate,
+      properties: {
+        trialdayDate: serverStartDate,
+        interestedIn: formData.interest,
+        reason: formData.reason,
+      },
+    });
 
 
-    // If member exists, check if oportunity exists to update.
-    if (memberExists) {
-      const opportunities: Array<OfficeRndOpportunity> = await this
-        .params.officeService.getOpportunities({
-          member: member._id,
-        });
-      if (opportunities.length > 0) {
-        // opportunities already exist, update to Trial Request status.
-        // TODO in the future we might have multiple opportinities for a member.
-        // We need to update the correct one.
-        // For now we just take the first one.
-        // update the opportunity.
-        const opportunityUpdate: OfficeRndOpportunityUpdate = {
-          name: `${formData.firstName} ${formData.lastName} - TRIAL DAY`,
-          status: trialRequestStatusId,
-          properties: {
-            trialdayDate: serverStartDate,
-            interestedIn: formData.interest,
-            reason: formData.reason,
-          },
-        };
-        if (!opportunities[0]._id) {
-          throw new AppError(
-            'TrialdayService.handleTrialdayRequest()- Opportunity id not found.',
-            ErrorCode.UNKNOWN_ERROR,
-            404,
-            { memberEmail: formData.email },
-          );
-        }
-        await this
-          .params
-          .officeService
-          .updateOpportunity(
-            opportunities[0]._id,
-            opportunityUpdate);
-      } else {
-        // existing member does not have an ooportunity, create a new one.
-        // TODO add requested plans.
-        await this.params.officeService.createOpportunity({
-          name: `${formData.firstName} ${formData.lastName} - TRIAL DAY`,
-          member: member._id,
-          status: trialRequestStatusId,
-          startDate: serverStartDate,
-          properties: {
-            trialdayDate: serverStartDate,
-            interestedIn: formData.interest,
-            reason: formData.reason,
-          },
-        });
-      }
-    } else {
-      // member did not exist yet so create new opportunity.
-      // TODO add requested plans.
-      await this.params.officeService.createOpportunity({
-        name: `${formData.firstName} ${formData.lastName} - TRIAL DAY`,
-        member: member._id,
-        status: trialRequestStatusId,
-        startDate: serverStartDate,
-        properties: {
-          trialdayDate: serverStartDate,
-          interestedIn: formData.interest,
-          reason: formData.reason,
-        },
-      });
-    }
-
-    // 4. Book a free desk for member.
+    // 4. Book a free desk for member without notification.
     // TODO add desk booking.
 
-    // 5. Send confirmation email
+    // 5. Create calendar event
+    // const calendarEvent = await this.params.calendarService.createEvent({
+    //   summary: `${formData.firstName} ${formData.lastName} - Trial Day`,
+    //   description: `Trial day for ${formData.firstName} ${formData.lastName}\n\nInterest: ${formData.interest.join(', ')}\nReason: ${formData.reason}`,
+    //   start: {
+    //     dateTime: serverStartDate.toISOString(),
+    //     timeZone: 'Europe/Madrid',
+    //   },
+    //   end: {
+    //     dateTime: serverEndDate.toISOString(),
+    //     timeZone: 'Europe/Madrid',
+    //   },
+    //   attendees: [
+    //     {
+    //       email: formData.email,
+    //       displayName: `${formData.firstName} ${formData.lastName}`,
+    //     },
+    //     {
+    //       email: 'hub@savage-coworking.com',
+    //       displayName: 'Savage Coworking',
+    //     },
+    //   ],
+    //   reminders: {
+    //     useDefault: true,
+    //   },
+    // });
+
+    throw new AppError(
+      'TrialdayService.handleTrialdayRequest()- Desk booking not implemented.',
+      ErrorCode.UNKNOWN_ERROR,
+      501,
+      { memberEmail: formData.email },
+    );
+
+    // 6. Send confirmation email
     const mailData: MailDataRequired = {
       from: {
         email: 'hub@savage-coworking.com', // sending email
@@ -240,7 +218,7 @@ export class TrialdayService {
         last_name: formData.lastName,
         trial_date: format(toZonedTime(serverStartDate, 'Europe/Madrid'), 'EEEE, \'the\' do \'of\' MMMM yyyy'),
         trial_start_time: format(toZonedTime(serverStartDate, 'Europe/Madrid'), 'h:mm a'),
-        // google_cal_url: calendarEventResponse?.htmlLink || '',
+        // google_cal_url: calendarEvent.htmlLink,
       },
     };
     await this.params.sendgridService.mailSend(
