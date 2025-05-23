@@ -10,6 +10,7 @@ import { FirestoreService } from '../../core/services/firestore-service';
 import { firebaseSecrets } from '../../core/config/firebase-secrets';
 import { isDevelopment } from '../../core/utils/environment';
 import { mainConfig } from '../../core/config/main-config';
+import { SetDoc } from '../../core/data/models';
 
 export class SendgridScheduledEvents implements InitializeScheduledEvents {
   initialize(add: AddScheduledEvent): void {
@@ -25,7 +26,7 @@ export class SendgridScheduledEvents implements InitializeScheduledEvents {
       {
         region: mainConfig.cloudFunctionsLocation,
         secrets: [firebaseSecrets.sendgridApiKey],
-        schedule: 'every 24 hours',
+        schedule: 'every 1 hours',
       }, async () => {
         try {
           logger.info('SendgridScheduledEvents.updateSendgrid()- Updating custom fields');
@@ -39,15 +40,23 @@ export class SendgridScheduledEvents implements InitializeScheduledEvents {
           // set the firestore sendgrid_data.meta document
           // with merge true, so only the provided fields will be updated
           if (!isDevelopment()) {
-            await firestoreService.setDocument({
-              collection: 'sendgrid_data',
-              documentId: 'meta',
-              data: {
-                customFields: customFields,
-                lists: lists,
-              },
+            const fieldData: Array<SetDoc> = customFields.map((field) => ({
+              collection: 'sendgrid',
+              documentId: `metadata/customFields/${field.id}`,
+              data: field,
               merge: true,
-            });
+            }));
+            const listData: Array<SetDoc> = lists.map((list) => ({
+              collection: 'sendgrid',
+              documentId: `metadata/lists/${list.id}`,
+              data: list,
+              merge: true,
+            }));
+            const data: Array<SetDoc> = [
+              ...fieldData,
+              ...listData,
+            ];
+            await firestoreService.setDocuments(data);
           } else {
             logger.debug('SendgridScheduledEvents.updateSendgrid()- In development mode, the custom fields and lists will not be updated in Firestore');
           }
