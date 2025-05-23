@@ -14,22 +14,18 @@ export class HttpServer {
   }
 
   get(path: string, requestHandler: RequestHandler): void {
-    logger.debug(`GET ${path}`);
     this.router.get(path, this._catchErrorHandler(requestHandler));
   }
 
   post(path: string, requestHandler: RequestHandler): void {
-    logger.debug(`POST ${path}`);
     this.router.post(path, this._catchErrorHandler(requestHandler));
   }
 
   put(path: string, requestHandler: RequestHandler): void {
-    logger.debug(`PUT ${path}`);
     this.router.put(path, this._catchErrorHandler(requestHandler));
   }
 
   delete(path: string, requestHandler: RequestHandler): void {
-    logger.debug(`DELETE ${path}`);
     this.router.delete(path, this._catchErrorHandler(requestHandler));
   }
 
