@@ -97,7 +97,10 @@ export class SendgridService {
     return lists;
   }
 
-  public async addContact(contact: SendgridContactRequest): Promise<string> {
+  public async addContacts(
+    lists: Array<string>,
+    contacts: Array<SendgridContactRequest>
+  ): Promise<string> {
     logger.info('SendgridService.addContact()- Adding contact');
     this.initialize();
     if (!this.client) {
@@ -106,7 +109,10 @@ export class SendgridService {
     const request: ClientRequest = {
       url: '/v3/marketing/contacts',
       method: 'PUT',
-      body: contact,
+      body: {
+        list_ids: lists,
+        contacts: contacts,
+      },
     };
     const [response, body] = await this.client.request(request);
     if (response.statusCode !== 202) {

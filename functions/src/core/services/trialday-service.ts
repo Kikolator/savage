@@ -2,6 +2,7 @@ import { logger } from 'firebase-functions';
 import {
   OfficeRndMember,
   OfficeRndNewMember,
+  SendgridContactRequest,
   TrialDayFormData,
 } from '../data/models';
 import { format, parse } from 'date-fns';
@@ -211,12 +212,25 @@ export class TrialdayService {
     //   },
     // });
 
-    throw new AppError(
-      'TrialdayService.handleTrialdayRequest()- Desk booking not implemented.',
-      ErrorCode.UNKNOWN_ERROR,
-      501,
-      { memberEmail: formData.email },
-    );
+    // Add contact to Sendgrid.
+    const newContact: SendgridContactRequest = {
+      email: formData.email,
+      first_name: formData.firstName,
+      last_name: formData.lastName,
+      phone_number_id: formData.phoneNumber,
+      custom_fields: {
+        membership_status: 'lead',
+        trial_start_date: serverStartDate.toDateString(),
+        newsletter_opt_in: 'true',
+      },
+    };
+    const listIds = [
+      '682200cd47119167b0c24e9a',
+      '682200cd47119167b0c24e9b',
+    ];
+    await this.params.sendgridService.addContacts(
+      listIds,
+      [newContact]);
 
     // 6. Send confirmation email
     const mailData: MailDataRequired = {

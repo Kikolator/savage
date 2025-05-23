@@ -1,4 +1,4 @@
-import { RequestHandler, Request } from 'express';
+import { RequestHandler } from 'express';
 import { Controller, HttpServer } from '..';
 // import { FirestoreService } from '../../../core/services/firestore-service';
 import { TYPEFORM_IDS } from '../../../core/config/typeform-ids';
@@ -38,7 +38,10 @@ class TypeformController implements Controller {
     logger.info('TypeformController.handleWebhook: handling typeform webhook');
 
     // First verify the typeform signature to ensure the request is legitimate
-    this.verifyTypeformSignature(request);
+    this.verifyTypeformSignature(
+      request.typeformSignature,
+      request.rawBody
+    );
 
     const typeformData = request.body as TypeformResponse;
 
@@ -90,19 +93,48 @@ class TypeformController implements Controller {
     await this.params.trialdayService.handleTrialdayRequest(formData);
   }
 
-  private verifyTypeformSignature(request: Request): void {
-    const signature = request.typeformSignature;
-    if (!signature) {
+  private verifyTypeformSignature(
+    receivedSignature: string | undefined,
+    payload: Buffer | undefined
+  ): void {
+    if (!receivedSignature) {
       throw new AppError('No signature found in request', ErrorCode.TYPEFORM_WEBHOOK_INVALID_SIGNATURE, 401);
     }
+    if (!payload) {
+      throw new AppError('No payload found in request, check the rawBodySaver middleware', ErrorCode.TYPEFORM_WEBHOOK_NO_RAW_BODY, 401);
+    }
     const secret = firebaseSecrets.typeformSecretKey.value();
-    const payload = request.body.toString();
-    const hash = crypto
-      .createHmac('sha256', secret)
-      .update(payload)
-      .digest('base64');
-    if (signature !== `sha256=${hash}`) {
-      throw new AppError('invalid signature', ErrorCode.TYPEFORM_WEBHOOK_INVALID_SIGNATURE, 401);
+
+    logger.debug('Typeform signature verification', {
+      receivedSignature,
+      payloadLength: payload.length,
+      payloadHex: payload.toString('hex').substring(0, 100),
+      secretLength: secret.length,
+      secretFirstChars: secret.substring(0, 4) + '...',
+    });
+
+    // Create HMAC and update with raw buffer
+    const hmac = crypto.createHmac('sha256', secret);
+    hmac.update(payload);
+    const hash = hmac.digest('base64');
+
+    const expectedSignature = `sha256=${hash}`;
+    logger.debug('Generated signature details', {
+      hash,
+      expectedSignature,
+      receivedSignature,
+      match: receivedSignature === expectedSignature,
+      payloadHexEnd: payload.toString('hex').substring(payload.length * 2 - 100),
+    });
+
+    if (receivedSignature !== expectedSignature) {
+      throw new AppError('invalid signature', ErrorCode.TYPEFORM_WEBHOOK_INVALID_SIGNATURE, 401, {
+        receivedSignature,
+        expectedSignature,
+        secretLength: secret.length,
+        hash,
+        payloadLength: payload.length,
+      });
     }
     return;
   }
