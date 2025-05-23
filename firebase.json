@@ -84,6 +84,11 @@
           "type": 302
         },
         {
+          "source": "/menu_01",
+          "destination": "https://my.savage-coworking.com/stores/67b7247d072ebf5a4941c246?office=5d1bcda0dbd6e40010479eec",
+          "type": 302
+        },
+        {
           "source": "/**",
           "destination": "https://savage-coworking.com/",
           "type": 301
