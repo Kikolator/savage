@@ -78,6 +78,8 @@ export const parseTypeformResponse = <T extends TypeformTypes>(
   }
   const answers = getAnswers(response);
   const result = {} as T;
+  result.eventId = response.event_id;
+  result.formId = formId;
   // Add hidden fields from the response if they exist in the form type
   if (response.form_response.hidden && mapping.hiddenFieldMappings) {
     const hiddenMapping = mapping.hiddenFieldMappings;

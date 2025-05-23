@@ -18,6 +18,7 @@ exports.api = onRequest(
     secrets: [
       firebaseSecrets.typeformSecretKey,
       firebaseSecrets.officeRndSecretKey,
+      firebaseSecrets.sendgridApiKey,
     ],
   },
   apiApp,

@@ -104,29 +104,11 @@ class TypeformController implements Controller {
       throw new AppError('No payload found in request, check the rawBodySaver middleware', ErrorCode.TYPEFORM_WEBHOOK_NO_RAW_BODY, 401);
     }
     const secret = firebaseSecrets.typeformSecretKey.value();
-
-    logger.debug('Typeform signature verification', {
-      receivedSignature,
-      payloadLength: payload.length,
-      payloadHex: payload.toString('hex').substring(0, 100),
-      secretLength: secret.length,
-      secretFirstChars: secret.substring(0, 4) + '...',
-    });
-
     // Create HMAC and update with raw buffer
     const hmac = crypto.createHmac('sha256', secret);
     hmac.update(payload);
     const hash = hmac.digest('base64');
-
     const expectedSignature = `sha256=${hash}`;
-    logger.debug('Generated signature details', {
-      hash,
-      expectedSignature,
-      receivedSignature,
-      match: receivedSignature === expectedSignature,
-      payloadHexEnd: payload.toString('hex').substring(payload.length * 2 - 100),
-    });
-
     if (receivedSignature !== expectedSignature) {
       throw new AppError('invalid signature', ErrorCode.TYPEFORM_WEBHOOK_INVALID_SIGNATURE, 401, {
         receivedSignature,

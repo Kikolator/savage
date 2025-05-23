@@ -3,6 +3,7 @@ import {
   OfficeRndMember,
   OfficeRndNewMember,
   SendgridContactRequest,
+  SendgridList,
   TrialDayFormData,
 } from '../data/models';
 import { format, parse } from 'date-fns';
@@ -29,9 +30,9 @@ export class TrialdayService {
   ) { }
 
   async handleTrialdayRequest(formData: TrialDayFormData): Promise<void> {
-    logger.info('TrialdayService.handleTrialdayRequest()- handling trialday request', {
+    logger.info(['TrialdayService.handleTrialdayRequest()- handling trialday request', {
       eventId: formData.eventId,
-    });
+    }]);
     // 0. Add to firestore.
     await this.params.firestoreService.createDocument({
       collection: this.trialDayRequestsCollection,
@@ -41,47 +42,29 @@ export class TrialdayService {
         ...formData,
       },
     });
-
     // 1. Set DateTime to UTC
     // Set timezone and parse start date time
     const dateTimeString = `${formData.preferredDate} ${formData.preferredTime}`;
-    logger.debug('dateTimeString', dateTimeString);
-
     // Parse the date string into a Date object
     // Standard Date is UTC as set in index: porcess.env.TZ.
     // Input date string is in Europe/Madrid (for now)
     const inputStartDate = parse(dateTimeString, 'yyyy-MM-dd HH:mm', new Date());
-    logger.debug('input start date', inputStartDate);
-
     // Convert input to utc timezone
     const serverStartDate = fromZonedTime(inputStartDate, 'Europe/Madrid');
-    logger.debug('server start date', serverStartDate);
-
     // TODO handle if timezone is provided in future versions.
     if (formData.timezone) {
       logger.warn('TrialdayService.handleTrialdayRequest()- timezone provided, but not used', {
         timezone: formData.timezone,
       });
     }
-
     // Set end time to 18:00 Madrid time on the same day
     // Madrid time will automatically handle DST transitions
-    const madridEndDate = parse(
-      `${formData.preferredDate}T18:00`,
-      'yyyy-MM-dd\'T\'HH:mm',
-      new Date()
-    );
-    logger.debug('madridEndTime', madridEndDate);
-    const serverEndDate = fromZonedTime(madridEndDate, 'Europe/Madrid');
-
-    logger.debug('TrialdayService.handleTrialdayRequest()- times', {
-      localStartDate: inputStartDate,
-      serverStartDate: serverStartDate,
-      madridEndDate: madridEndDate,
-      serverEndDate: serverEndDate,
-    });
-
-
+    // const madridEndDate = parse(
+    //   `${formData.preferredDate}T18:00`,
+    //   'yyyy-MM-dd\'T\'HH:mm',
+    //   new Date()
+    // );
+    // const serverEndDate = fromZonedTime(madridEndDate, 'Europe/Madrid');
     // 2. Check if email is already a member
     const members: Array<OfficeRndMember> =
       await this.params.officeService.getMembersByEmail(formData.email);
@@ -145,7 +128,6 @@ export class TrialdayService {
       );
       // TODO handle multiple office rnd accounts with same email error.
     }
-
     // 3. Add Opportunity to member.
     // get the opportunity statusses.
     const trialRequestStatusses = await this
@@ -180,11 +162,8 @@ export class TrialdayService {
         reason: formData.reason,
       },
     });
-
-
     // 4. Book a free desk for member without notification.
     // TODO add desk booking.
-
     // 5. Create calendar event
     // const calendarEvent = await this.params.calendarService.createEvent({
     //   summary: `${formData.firstName} ${formData.lastName} - Trial Day`,
@@ -211,28 +190,76 @@ export class TrialdayService {
     //     useDefault: true,
     //   },
     // });
-
-    // Add contact to Sendgrid.
+    // get custom fields from firestore (location, membership_status, trial_start_date, referrer_email, newsletter_opt_in, signup_source).
+    const customFieldsQuery = await this
+      .params
+      .firestoreService
+      .getCollection(
+        'sendgrid/metadata/customFields',
+      );
+    const customFields: { [key: string]: string} = {};
+    customFieldsQuery.map((item) => {
+      switch (item.name) {
+        case 'location':
+          customFields[item.id] = 'Estepona, Spain';
+          break;
+        case 'membership_status':
+          customFields[item.id] = 'lead';
+          break;
+        case 'trial_start_date':
+          customFields[item.id] = serverStartDate.toDateString();
+          break;
+        case 'referrer_email':
+          customFields[item.id] = formData.referralEmail || '';
+          break;
+        case 'newsletter_opt_in':
+          customFields[item.id] = 'true';
+          break;
+        case 'signup_source':
+          customFields[item.id] = formData.utmSource || 'trialday-form';
+          break;
+        default:
+          break;
+      }
+    });
+    // Create new contact object.
     const newContact: SendgridContactRequest = {
       email: formData.email,
       first_name: formData.firstName,
       last_name: formData.lastName,
       phone_number_id: formData.phoneNumber,
-      custom_fields: {
-        membership_status: 'lead',
-        trial_start_date: serverStartDate.toDateString(),
-        newsletter_opt_in: 'true',
-      },
+      custom_fields: customFields,
     };
-    const listIds = [
-      '682200cd47119167b0c24e9a',
-      '682200cd47119167b0c24e9b',
-    ];
+    // query sendgrid metadata collection for lead list id.
+    const LeadListQuery = await this.params.firestoreService.queryCollection(
+      'sendgrid/metadata/lists',
+      {
+        field: 'name',
+        operator: '==',
+        value: 'leads',
+      });
+    if (LeadListQuery.length === 0) {
+      throw new AppError(
+        'TrialdayService.handleTrialdayRequest()- Lead list not found.',
+        ErrorCode.SENDGRID_LIST_NOT_FOUND,
+        404,
+        { memberEmail: formData.email },
+      );
+    }
+    if (LeadListQuery.length > 1) {
+      throw new AppError(
+        'TrialdayService.handleTrialdayRequest()- Multiple lead lists found.',
+        ErrorCode.SENDGRID_MULTIPLE_LISTS_FOUND,
+        404,
+        { memberEmail: formData.email },
+      );
+    }
+    const leadList = LeadListQuery[0] as SendgridList;
+    // Add contact to Sendgrid.
     await this.params.sendgridService.addContacts(
-      listIds,
+      [leadList.id],
       [newContact]);
-
-    // 6. Send confirmation email
+    // Build mail data.
     const mailData: MailDataRequired = {
       from: {
         email: 'hub@savage-coworking.com', // sending email
@@ -245,18 +272,18 @@ export class TrialdayService {
         last_name: formData.lastName,
         trial_date: format(toZonedTime(serverStartDate, 'Europe/Madrid'), 'EEEE, \'the\' do \'of\' MMMM yyyy'),
         trial_start_time: format(toZonedTime(serverStartDate, 'Europe/Madrid'), 'h:mm a'),
-        // google_cal_url: calendarEvent.htmlLink,
       },
     };
+    // Send confirmation email.
     await this.params.sendgridService.mailSend(
       mailData
     );
-
+    // update trial day request status to confirmation-email-sent.
     await this.params.firestoreService.updateDocument({
       collection: this.trialDayRequestsCollection,
       documentId: formData.eventId,
       data: {
-        status: 'confirmed',
+        status: 'confirmation-email-sent',
       },
     });
   }
