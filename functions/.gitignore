@@ -13,6 +13,7 @@ node_modules/
 .secrets*
 
 # MacOS
+*.DS_Store
 src/core/.DS_Store
 src/core/data/.DS_Store
 src/core/data/models/.DS_Store
