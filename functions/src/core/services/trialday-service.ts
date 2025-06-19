@@ -197,7 +197,7 @@ export class TrialdayService {
       .getCollection(
         'sendgrid/metadata/customFields',
       );
-    const customFields: { [key: string]: string} = {};
+    const customFields: { [key: string]: string } = {};
     customFieldsQuery.map((item) => {
       switch (item.name) {
         case 'location':
@@ -233,11 +233,11 @@ export class TrialdayService {
     // query sendgrid metadata collection for lead list id.
     const LeadListQuery = await this.params.firestoreService.queryCollection(
       'sendgrid/metadata/lists',
-      {
+      [{
         field: 'name',
         operator: '==',
         value: 'leads',
-      });
+      }]);
     if (LeadListQuery.length === 0) {
       throw new AppError(
         'TrialdayService.handleTrialdayRequest()- Lead list not found.',

@@ -1,6 +1,6 @@
 import { logger } from 'firebase-functions';
 import { officeRndConfig } from '../config/office-rnd-config';
-import { OfficeRndLocation, OfficeRndMember, OfficeRndMemberProperties, OfficeRndNewMember, OfficeRndOpportunity, OfficeRndOpportunityStatus, OfficeRndOpportunityUpdate, OfficeRndTokenResponse, SetDoc } from '../data/models';
+import { OfficeRndLocation, OfficeRndMember, OfficeRndMemberProperties, OfficeRndNewMember, OfficeRndOpportunity, OfficeRndOpportunityStatus, OfficeRndOpportunityUpdate, OfficeRndPaymentLine, OfficeRndTokenResponse, SetDoc } from '../data/models';
 import { FirestoreService } from './firestore-service';
 import { AppError, ErrorCode } from '../errors/app-error';
 import { firebaseSecrets } from '../config/firebase-secrets';
@@ -442,5 +442,103 @@ export default class OfficeRndService {
       throw new AppError('OfficeRndService.createOpportunity()- Failed to create Office Rnd opportunity', ErrorCode.UNKNOWN_ERROR, response.status, body);
     }
     return;
+  }
+
+  public async addOverPayment(params: {
+    memberId: string,
+    paymentLines: OfficeRndPaymentLine[],
+    issueDate: Date,
+    companyId?: string,
+  }): Promise<void> {
+    logger.info('OfficeRndService.addOverPayment() - Adding Overpayment', { memberId: params.memberId, companyId: params.companyId, paymentLines: params.paymentLines, issueDate: params.issueDate });
+    // initilize token.
+    await this.initializeToken();
+    if (this.token == null) {
+      throw new AppError('OfficeRndService.addOverPayment()- Office Rnd token is null', ErrorCode.UNKNOWN_ERROR, 500);
+    }
+    const url = `${officeRndConfig.apiV2url}/${officeRndConfig.orgSlug}/payments`;
+
+    const options = {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'content-type': 'application/json',
+        'authorization': `Bearer ${this.token.access_token}`,
+      },
+      body: JSON.stringify({
+        date: params.issueDate,
+        location: officeRndConfig.defaultLocationId,
+        lines: params.paymentLines,
+        member: params.memberId,
+        company: params.companyId,
+        currency: 'EUR',
+
+      }),
+    };
+
+    const response = await fetch(url, options);
+    const body = await response.json();
+    if (response.status !== 201) {
+      throw new AppError('OfficeRndService.addOverPayment()- Failed to add overpayment', ErrorCode.UNKNOWN_ERROR, response.status, body);
+    }
+    return;
+  }
+
+  /**
+   * Adds a new fee to Office Rnd.
+   * @param params - The parameters for the new fee.
+   * @returns The ID of the new fee.
+   */
+  public async addNewFee(params: {
+    feeName: string,
+    issueDate: Date,
+    planId: string,
+    price: number,
+    memberId: string,
+    companyId: string | null,
+  }): Promise<string> {
+    logger.info('OfficeRndService.addNewFee() - Adding new fee', { feeName: params.feeName, issueDate: params.issueDate, planId: params.planId, price: params.price, memberId: params.memberId, companyId: params.companyId });
+    // initilize token.
+    await this.initializeToken();
+    if (this.token == null) {
+      throw new AppError('OfficeRndService.addNewFee()- Office Rnd token is null', ErrorCode.UNKNOWN_ERROR, 500);
+    }
+
+    const bodyObject: {
+      name: string;
+      issueDate: string;
+      location: string;
+      plan: string;
+      price: number;
+      member: string;
+      company?: string;
+    } = {
+      name: params.feeName,
+      issueDate: params.issueDate.toDateString(),
+      location: officeRndConfig.defaultLocationId,
+      plan: params.planId,
+      price: params.price,
+      member: params.memberId,
+    };
+    if (params.companyId !== null) {
+      bodyObject.company = params.companyId;
+    }
+
+    const url = `${officeRndConfig.apiV2url}/${officeRndConfig.orgSlug}/fees`;
+    const options = {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'content-type': 'application/json',
+        'authorization': `Bearer ${this.token.access_token}`,
+      },
+      body: JSON.stringify(bodyObject),
+    };
+    const response = await fetch(url, options);
+    const body = await response.json();
+    if (response.status !== 201) {
+      throw new AppError('OfficeRndService.addNewFee()- Failed to add new fee', ErrorCode.UNKNOWN_ERROR, response.status, body);
+    }
+    return body._id;
   }
 }

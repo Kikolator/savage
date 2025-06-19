@@ -5,6 +5,9 @@ import {
   DocumentData,
   QuerySnapshot,
   WhereFilterOp,
+  DocumentReference,
+  Transaction,
+  WriteBatch,
 } from 'firebase-admin/firestore';
 import { CreateDoc, SetDoc, UpdateDoc } from '../data/models';
 import { AppError, ErrorCode } from '../errors/app-error';
@@ -68,6 +71,30 @@ export class FirestoreService {
       updated_at: FieldValue.serverTimestamp(),
     });
   }
+
+  // Set multiple documents in a batch.
+  public async updateDocuments(data: UpdateDoc[]) {
+    logger.info(['FirestoreService.updateDocuments()- updating documents in Firestore.', {
+      amount: data.length,
+      data: data,
+    }]);
+    const db = this.getDb();
+    const batch = db.batch();
+    data.forEach((doc) => {
+      let docRef;
+      if (!doc.documentId) {
+        docRef = db.collection(doc.collection).doc();
+      } else {
+        docRef = db.collection(doc.collection).doc(doc.documentId);
+      }
+      batch.update(docRef, {
+        ...doc.data,
+        updated_at: FieldValue.serverTimestamp(),
+      });
+    });
+    await batch.commit();
+  }
+
 
   // Sets a document in firestore
   // If documentId is provided, updates the document with the given id
@@ -182,21 +209,84 @@ export class FirestoreService {
 
   public async queryCollection(
     collection: string,
-    filter: {
+    filters: {
       field: string,
       operator: WhereFilterOp,
-      value: string,
-    },
+      value: string | number | boolean,
+    }[],
   ): Promise<Array<DocumentData>> {
     logger.info(['FirestoreService.queryCollection()- querying collection from Firestore.', {
       collection: collection,
-      filter: filter,
+      filters: filters,
     }]);
     const db = this.getDb();
-    const querySnapshot: QuerySnapshot<DocumentData> = await db
-      .collection(collection)
-      .where(filter.field, filter.operator, filter.value)
-      .get();
+    let query: ReturnType<typeof db.collection> | ReturnType<ReturnType<typeof db.collection>['where']> = db.collection(collection);
+
+    filters.forEach((filter) => {
+      query = query.where(filter.field, filter.operator, filter.value);
+    });
+
+    const querySnapshot: QuerySnapshot<DocumentData> = await query.get();
     return querySnapshot.docs.map((doc) => doc.data());
+  }
+
+  public createReference(collection: string): DocumentReference {
+    const db = this.getDb();
+    return db.collection(collection).doc();
+  }
+
+  public async runBatch(batch: (batch: WriteBatch) => Promise<void>) {
+    logger.info('FirestoreService.runBatch()- starting batch operation');
+    const db = this.getDb();
+    const writeBatch = db.batch();
+
+    try {
+      await batch(writeBatch);
+      await writeBatch.commit();
+      logger.info('FirestoreService.runBatch()- batch operation completed successfully');
+    } catch (error) {
+      logger.error('FirestoreService.runBatch()- batch operation failed', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Runs a transaction that ensures atomicity and prevents data races.
+   * The transaction function receives a transaction object that should be used
+   * for all Firestore operations within the transaction.
+   * @param updateFunction - Function that performs the transaction operations
+   * @returns The result of the transaction function
+   */
+  public async runTransaction<T>(
+    updateFunction: (transaction: Transaction) => Promise<T>
+  ): Promise<T> {
+    logger.info('FirestoreService.runTransaction()- starting transaction');
+    const db = this.getDb();
+
+    try {
+      const result = await db.runTransaction(updateFunction);
+      logger.info('FirestoreService.runTransaction()- transaction completed successfully');
+      return result;
+    } catch (error) {
+      logger.error('FirestoreService.runTransaction()- transaction failed', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Gets the Firestore database instance.
+   * This method is public to allow access to the database instance for transactions.
+   * @returns The Firestore database instance
+   */
+  public getFirestoreInstance(): Firestore {
+    return this.getDb();
+  }
+
+  /**
+   * Gets the FieldValue utility for server timestamps.
+   * @returns The FieldValue utility
+   */
+  public getFieldValue(): typeof FieldValue {
+    return FieldValue;
   }
 }

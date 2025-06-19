@@ -5,6 +5,7 @@ export enum ErrorCode {
   NOT_FOUND = 1002,
   UNAUTHORIZED = 1003,
   FORBIDDEN = 1004,
+  INVALID_ARGUMENT = 1005,
 
   // TrialDay Service errors (2000-2999)
   TRIALDAY_MEMBER_NOT_ALLOWED = 2000,
