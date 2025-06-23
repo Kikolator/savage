@@ -1,6 +1,7 @@
 # Savage Coworking
 
-#### Documentation:
+## Documentation:
+
 - [API v1](./docs/API_V1.md)
 - [Functions](./docs/FUNCTIONS.md)
 - [Hosting](./docs/HOSTING.md)
@@ -8,7 +9,8 @@
 - [Sendgrid](./docs/SENDGRID.md)
 
 Git Branches:
-- main: latest firebase deploy **v0.3**
+
+- main: latest firebase deploy **v0.4**
 - dev: development area
 
-Move dev changes to main by merging branches (don't rebase).  
+Move dev changes to main by merging branches (don't rebase).
