@@ -10,7 +10,7 @@
 
 Git Branches:
 
-- main: latest firebase deploy **v0.4**
+- main: latest firebase deploy **v0.5**
 - dev: development area
 
 Move dev changes to main by merging branches (don't rebase).
