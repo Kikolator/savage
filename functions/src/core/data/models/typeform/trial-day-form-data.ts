@@ -12,7 +12,7 @@ export interface TrialDayFormData {
     legal: boolean;
     submittedAt: string;
     timezone?: string;
-    referralEmail?: string;
+    referralCode?: string;
     hiddenEmail?: string;
     hiddenFirstName?: string;
     hiddenLastName?: string;

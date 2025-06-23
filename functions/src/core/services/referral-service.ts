@@ -106,6 +106,7 @@ export class ReferralService {
     public async createReferral(params: {
         referralCode: string,
         referredUserId: string,
+        referrerCompanyId: string | null,
         isTrialday: boolean,
         trialdayStartDate?: Date,
         membershipStartDate?: Date,

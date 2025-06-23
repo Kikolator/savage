@@ -9,7 +9,7 @@ interface TypeformMapping<T extends TypeformTypes> {
   formType: T;
   submittedAt: string;
   fieldMappings: Record<keyof T, string>;
-  hiddenFieldMappings?: Record< keyof T, string>;
+  hiddenFieldMappings?: Record<keyof T, string>;
 }
 
 const typeformMappings: TypeformMapping<TypeformTypes>[] = [
@@ -32,7 +32,7 @@ const typeformMappings: TypeformMapping<TypeformTypes>[] = [
       hiddenEmail: 'email',
       hiddenFirstName: 'first_name',
       hiddenLastName: 'last_name',
-      referralEmail: 'referral_email',
+      referralCode: 'referral_code',
       timezone: 'timezone',
       userId: 'user_id',
       utmCampaign: 'utm_campaign',

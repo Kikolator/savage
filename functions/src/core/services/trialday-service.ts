@@ -16,6 +16,7 @@ import { AppError, ErrorCode } from '../errors/app-error';
 import { officeRndConfig } from '../config/office-rnd-config';
 import { MailDataRequired } from '@sendgrid/mail';
 import { FirestoreService } from './firestore-service';
+import { ReferralService } from './referral-service';
 
 export class TrialdayService {
   private readonly trialDayRequestsCollection = 'trialDayRequests';
@@ -26,6 +27,7 @@ export class TrialdayService {
       calendarService: GoogleCalService,
       officeService: OfficeRndService,
       firestoreService: FirestoreService,
+      referralService: ReferralService,
     }
   ) { }
 
@@ -209,8 +211,8 @@ export class TrialdayService {
         case 'trial_start_date':
           customFields[item.id] = serverStartDate.toDateString();
           break;
-        case 'referrer_email':
-          customFields[item.id] = formData.referralEmail || '';
+        case 'referrer_code':
+          customFields[item.id] = formData.referralCode || '';
           break;
         case 'newsletter_opt_in':
           customFields[item.id] = 'true';
@@ -286,5 +288,15 @@ export class TrialdayService {
         status: 'confirmation-email-sent',
       },
     });
+    // 6. Add referral code to referral service.
+    if (formData.referralCode) {
+      await this.params.referralService.createReferral({
+        referralCode: formData.referralCode,
+        referredUserId: member._id,
+        referrerCompanyId: member.company,
+        isTrialday: true,
+        trialdayStartDate: serverStartDate,
+      });
+    }
   }
 }
