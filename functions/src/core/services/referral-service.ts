@@ -44,6 +44,18 @@ export class ReferralService {
             referrerType: params.referrerType,
         }]);
 
+        // Check if referrer has permission to create referral code.
+        // And referral code does not already exist.
+        const officeRndService = this.params.officeRndService;
+        const referrer = await officeRndService.getMember(params.referrerId);
+        if (!referrer.properties.referralPermission) {
+            throw new AppError('Referrer does not have permission to create referral code', ErrorCode.INVALID_ARGUMENT, 400);
+        }
+
+        if (referrer.properties.referralOwnCode) {
+            throw new AppError('Referrer already has a referral code', ErrorCode.INVALID_ARGUMENT, 400);
+        }
+
         let referralCode: ReferralCode | null = null;
         let attempts = 0;
         const maxAttempts = 10; // Prevent infinite loops
@@ -53,6 +65,7 @@ export class ReferralService {
 
             // Create new referral code object
             const candidate = new ReferralCode({
+                documentId: params.referrerId,
                 code: this.generateReferralCode(),
                 ownerId: params.referrerId,
                 companyId: params.referrerCompanyId,
@@ -67,7 +80,7 @@ export class ReferralService {
                 // Attempt to create the document in firestore
                 const data: CreateDoc = {
                     collection: this.referralCodesCollection,
-                    documentId: candidate.code,
+                    documentId: candidate.documentId,
                     data: candidate.toDocumentData()
                 };
                 await this.params.firestoreService.createDocument(data);

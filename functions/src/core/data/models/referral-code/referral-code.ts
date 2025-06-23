@@ -2,6 +2,7 @@ import { DocumentData } from "firebase-admin/firestore";
 import { ReferrerType } from "../../enums";
 
 export class ReferralCode {
+    documentId: string; // same as ownerId (officeRnd)
     code: string;
     ownerId: string;
     companyId: string | null;
@@ -16,6 +17,7 @@ export class ReferralCode {
     referredUsers: string[];
 
     constructor(params: {
+        documentId: string;
         code: string;
         ownerId: string;
         companyId: string | null;
@@ -25,6 +27,7 @@ export class ReferralCode {
         totalRewardedEur: number;
         referredUsers: string[];
     }) {
+        this.documentId = params.documentId;
         this.code = params.code;
         this.ownerId = params.ownerId;
         this.companyId = params.companyId;
@@ -37,7 +40,8 @@ export class ReferralCode {
 
     static fromDocumentData(id: string, data: DocumentData): ReferralCode {
         return new ReferralCode({
-            code: id,
+            documentId: id,
+            code: data.code as string,
             ownerId: data.ownerId as string,
             companyId: data.companyId as string | null,
             ownerType: data.ownerType as ReferrerType,
@@ -50,6 +54,7 @@ export class ReferralCode {
 
     toDocumentData(): DocumentData {
         return {
+            documentId: this.documentId,
             code: this.code,
             ownerId: this.ownerId,
             companyId: this.companyId,

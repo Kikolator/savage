@@ -5,6 +5,7 @@ export interface OfficeRndMemberProperties {
   reason?: string;
   referralOwnCode?: string;
   referralCodeUsed?: string;
+  referralPermission?: boolean;
   //   accessCode: string;
   //   receiveNewsletter: boolean;
 }

@@ -1,4 +1,8 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:referral/firebase_options.dart';
+import 'package:referral/services/cloud_function_service.dart';
+import 'package:referral/services/firestore_service.dart';
 import 'package:responsive_builder/responsive_builder.dart';
 import 'package:referral/app/app.bottomsheets.dart';
 import 'package:referral/app/app.dialogs.dart';
@@ -10,6 +14,11 @@ import 'package:flutter_animate/flutter_animate.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   setPathUrlStrategy();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  await FirestoreService.initialize();
+  await CloudFunctionService.initialize();
   await setupLocator(stackedRouter: stackedRouter);
   setupDialogUi();
   setupBottomSheetUi();

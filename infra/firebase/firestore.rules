@@ -64,5 +64,12 @@ service cloud.firestore {
       allow get: if isOwner(resource.data.member_id) || isAdmin();
       allow list: if signedIn();
     }
+
+    // Can get ReferralCodes/doc if docId == ownerId
+    // ReferralCodes can only be created by admin
+    match /referralCodes/{documentId} {
+      // allow read: if resource.data.ownerId == documentId;
+      allow read: if true;
+    } 
   }
 }

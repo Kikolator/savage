@@ -4,6 +4,7 @@ import { onRequest } from 'firebase-functions/v2/https';
 import { mainConfig } from './core/config/main-config';
 import apiApp from './api';
 import { firebaseSecrets } from './core/config/firebase-secrets';
+import { callableFunctions } from './app-functions';
 
 // Set timezone to UTC
 process.env.TZ = 'UTC';
@@ -26,3 +27,6 @@ exports.api = onRequest(
 
 // Scheduled functions
 Object.assign(exports, scheduledEvents());
+
+// App Functions
+Object.assign(exports, callableFunctions());

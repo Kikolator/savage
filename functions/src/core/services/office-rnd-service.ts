@@ -129,6 +129,31 @@ export default class OfficeRndService {
     return;
   }
 
+  public async getMember(id: string): Promise<OfficeRndMember> {
+    logger.info('OfficeRndService.getMember() - Getting member', { id: id });
+    // initilize token.
+    await this.initializeToken();
+    if (this.token == null) {
+      throw new AppError('OfficeRndService.getMember()- Office Rnd token is null', ErrorCode.UNKNOWN_ERROR, 500);
+    }
+    // Get member from Office Rnd.
+    const url = `${officeRndConfig.apiV2url}/${officeRndConfig.orgSlug}/members/${id}`;
+    const options = {
+      method: 'GET',
+      headers: {
+        'accept': 'application/json',
+        'authorization': `Bearer ${this.token.access_token}`,
+      },
+    };
+    const response = await fetch(url, options);
+    const body = await response.json();
+    if (response.status !== 200) {
+      throw new AppError('OfficeRndService.getMember()- Failed to get Office Rnd member', ErrorCode.UNKNOWN_ERROR, 500, body);
+    }
+    const member: OfficeRndMember = body;
+    return member;
+  }
+
   // Gets members by email from Office Rnd.
   // Returns an array of OfficeRndMember objects.
   public async getMembersByEmail(

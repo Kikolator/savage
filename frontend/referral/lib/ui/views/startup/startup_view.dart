@@ -14,13 +14,20 @@ class StartupView extends StackedView<StartupViewModel> {
     StartupViewModel viewModel,
     Widget? child,
   ) {
+    if (viewModel.modelError != null) {
+      return Scaffold(
+        body: Center(
+          child: Text('Error: ${viewModel.modelError}'),
+        ),
+      );
+    }
     return const Scaffold(
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'STACKED',
+              'SAVAGE REFERRALS',
               style: TextStyle(fontSize: 40, fontWeight: FontWeight.w900),
             ),
             Row(
