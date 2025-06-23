@@ -30,57 +30,57 @@
       "redirects": [
         {
           "source": "/",
-          "destination": "https://savage-coworking.com/",
+          "destination": "https://savage-coworking.com/?utm_source=qr&utm_medium=qr-no-code&utm_campaign=qr",
           "type": 301
         },
         {
           "source": "/2kHLrT",
-          "destination": "https://savage-coworking.com/",
+          "destination": "https://savage-coworking.com/?utm_source=qr&utm_medium=brochure-english&utm_campaign=qr",
           "type": 302
         },
         {
           "source": "/4x7PQ2",
-          "destination": "https://savage-coworking.com/es",
+          "destination": "https://savage-coworking.com/es/?utm_source=qr&utm_medium=brochure-spanish&utm_campaign=qr",
           "type": 302
         },
         {
           "source": "/Z4R9TQ",
-          "destination": "https://savage-coworking.com/",
+          "destination": "https://savage-coworking.com/?utm_source=qr&utm_medium=map&utm_campaign=qr",
           "type": 302
         },
         {
           "source": "/H4K5ZQ",
-          "destination": "https://instagram.com/savagecoworking",
+          "destination": "https://savage-coworking.com/?utm_source=qr&utm_medium=business-card-nic&utm_campaign=qr",
           "type": 302
         },
         {
           "source": "/W3P7XQ",
-          "destination": "https://instagram.com/savagecoworking",
+          "destination": "https://savage-coworking.com/?utm_source=qr&utm_medium=business-card-ines&utm_campaign=qr",
           "type": 302
         },
         {
           "source": "/a9B3Zd",
-          "destination": "https://instagram.com/savagecoworking",
+          "destination": "https://savage-coworking.com/?utm_source=qr&utm_medium=map-easter-egg&utm_campaign=qr",
           "type": 302
         },
         {
           "source": "/A7B2D9",
-          "destination": "https://instagram.com/savagecoworking",
+          "destination": "https://savage-coworking.com/?utm_source=qr&utm_medium=window-sticker&utm_campaign=qr",
           "type": 302
         },
         {
           "source": "/B7aD1c",
-          "destination": "https://savage-coworking.com/trial-day",
+          "destination": "https://savage-coworking.com/subscriptions/#trial-day?utm_source=qr&utm_medium=flyer&utm_campaign=trial-day",
           "type": 302
         },
         {
           "source": "/INAURSVP",
-          "destination": "https://savage-coworking.com/opening-rsvp",
+          "destination": "https://savage-coworking.com/?utm_source=qr&utm_medium=opening-rsvp&utm_campaign=opening",
           "type": 302
         },
         {
           "source": "/BRAC112",
-          "destination": "https://savage-coworking.com/",
+          "destination": "https://savage-coworking.com/?utm_source=qr&utm_medium=opening-brac&utm_campaign=opening",
           "type": 302
         },
         {
@@ -90,7 +90,7 @@
         },
         {
           "source": "/**",
-          "destination": "https://savage-coworking.com/",
+          "destination": "https://savage-coworking.com/?utm_source=qr&utm_medium=qr-catchall&utm_campaign=qr",
           "type": 301
         }
       ]
