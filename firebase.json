@@ -20,6 +20,21 @@
       ]
     },
     {
+      "target": "referral",
+      "public": "frontend/referral/build/web",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "**",
+          "destination": "/index.html"
+        }
+      ]
+    },
+    {
       "target": "qr",
       "public": "frontend/qr",
       "ignore": [
