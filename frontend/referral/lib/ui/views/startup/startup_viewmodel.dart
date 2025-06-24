@@ -28,7 +28,8 @@ class StartupViewModel extends BaseViewModel {
         return;
       } else {
         // Else redierct to HomeView.
-        await _routerService.replaceWith(const HomeViewRoute());
+        await _routerService
+            .replaceWith(HomeViewRoute(referralCode: referralCode));
       }
     } catch (e) {
       setError(e.toString());

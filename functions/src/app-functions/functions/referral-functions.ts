@@ -1,6 +1,6 @@
-import { logger } from "firebase-functions";
+import { logger } from "firebase-functions/v2";
 import { AddCallableFunction, CallableV2Function, InitializeCallableFunctions } from "../initialize-callable-functions";
-import { onCall } from "firebase-functions/v2/https";
+import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { mainConfig } from "../../core/config/main-config";
 import { CreateReferralCodeCallData } from "../../core/data/models/referral-code/create-referral-code-call-data";
 import { FirestoreService } from "../../core/services/firestore-service";
@@ -21,7 +21,7 @@ export class ReferralFunctions implements InitializeCallableFunctions {
         handler: onCall({
             region: mainConfig.cloudFunctionsLocation,
             // TODO update cors settings for production.
-            cors: ['http://localhost:57102', 'http://localhost:3000', 'http://localhost:8080']
+            cors: ['http://localhost:*', 'https://localhost:*']
         }, async (request) => {
             try {
                 logger.debug('creating referral code');
@@ -50,7 +50,33 @@ export class ReferralFunctions implements InitializeCallableFunctions {
                 return referralCode;
             } catch (error) {
                 logger.error('Error creating referral code', error);
-                throw new AppError('Error creating referral code', ErrorCode.UNKNOWN_ERROR, 500, error);
+                if (error instanceof AppError) {
+                    if (error.code === ErrorCode.REFERRAL_CODE_ALREADY_EXISTS) {
+                        throw new HttpsError(
+                            'already-exists',
+                            'Referral code already exists ' +
+                            'for the user, so you cannot create a new one.',
+                        );
+                    } else if (error.code === ErrorCode.REFERRAL_CODE_NO_PERMISSION) {
+                        throw new HttpsError(
+                            'permission-denied',
+                            'User does not have permission to create a referral code.',
+                        );
+                    } else {
+                        throw new HttpsError(
+                            'unknown',
+                            'Error creating referral code',
+                            `Error creating referral code: ${error.message} //` +
+                            ` Code: ${error.code}`,
+                        );
+                    }
+                } else {
+                    throw new HttpsError(
+                        'unknown',
+                        'Error creating referral code',
+                        error
+                    );
+                }
             }
         }),
     };

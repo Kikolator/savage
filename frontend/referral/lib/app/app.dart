@@ -10,6 +10,7 @@ import 'package:referral/services/firestore_service.dart';
 import 'package:referral/ui/views/sign_up/sign_up_view.dart';
 import 'package:referral/services/context_service.dart';
 import 'package:referral/services/cloud_function_service.dart';
+import 'package:referral/ui/dialogs/show_qr/show_qr_dialog.dart';
 // @stacked-import
 
 @StackedApp(
@@ -40,11 +41,12 @@ import 'package:referral/services/cloud_function_service.dart';
   ],
   bottomsheets: [
     StackedBottomsheet(classType: NoticeSheet),
-    // @stacked-bottom-sheet
+// @stacked-bottom-sheet
   ],
   dialogs: [
     StackedDialog(classType: InfoAlertDialog),
-    // @stacked-dialog
+    StackedDialog(classType: ShowQrDialog),
+// @stacked-dialog
   ],
   logger: StackedLogger(),
 )

@@ -39,6 +39,11 @@ export enum ErrorCode {
   // Firestore Service errors (7000-7999)
   DOCUMENT_NOT_FOUND = 7000,
   COLLECTION_EMPTY = 7001,
+
+  // Referral Service errors (8000-8999)
+  REFERRAL_CODE_ALREADY_EXISTS = 8000,
+  REFERRAL_CODE_NOT_FOUND = 8001,
+  REFERRAL_CODE_NO_PERMISSION = 8002,
 }
 
 export class AppError extends Error {

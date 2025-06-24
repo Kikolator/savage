@@ -9,6 +9,7 @@ import 'package:flutter/material.dart' as _i7;
 import 'package:stacked/stacked.dart' as _i6;
 import 'package:stacked_services/stacked_services.dart' as _i5;
 
+import '../data/referral_code.dart' as _i8;
 import '../ui/views/home/home_view.dart' as _i2;
 import '../ui/views/sign_up/sign_up_view.dart' as _i3;
 import '../ui/views/startup/startup_view.dart' as _i1;
@@ -32,9 +33,13 @@ class StackedRouterWeb extends _i6.RootStackRouter {
       );
     },
     HomeViewRoute.name: (routeData) {
+      final args = routeData.argsAs<HomeViewArgs>();
       return _i6.CustomPage<dynamic>(
         routeData: routeData,
-        child: const _i2.HomeView(),
+        child: _i2.HomeView(
+          referralCode: args.referralCode,
+          key: args.key,
+        ),
         opaque: true,
         barrierDismissible: false,
       );
@@ -98,14 +103,36 @@ class StartupViewRoute extends _i6.PageRouteInfo<void> {
 
 /// generated route for
 /// [_i2.HomeView]
-class HomeViewRoute extends _i6.PageRouteInfo<void> {
-  const HomeViewRoute()
-      : super(
+class HomeViewRoute extends _i6.PageRouteInfo<HomeViewArgs> {
+  HomeViewRoute({
+    required _i8.ReferralCode referralCode,
+    _i7.Key? key,
+  }) : super(
           HomeViewRoute.name,
           path: '/home-view',
+          args: HomeViewArgs(
+            referralCode: referralCode,
+            key: key,
+          ),
         );
 
   static const String name = 'HomeView';
+}
+
+class HomeViewArgs {
+  const HomeViewArgs({
+    required this.referralCode,
+    this.key,
+  });
+
+  final _i8.ReferralCode referralCode;
+
+  final _i7.Key? key;
+
+  @override
+  String toString() {
+    return 'HomeViewArgs{referralCode: $referralCode, key: $key}';
+  }
 }
 
 /// generated route for
@@ -141,10 +168,16 @@ extension RouterStateExtension on _i5.RouterService {
     );
   }
 
-  Future<dynamic> navigateToHomeView(
-      {void Function(_i6.NavigationFailure)? onFailure}) async {
+  Future<dynamic> navigateToHomeView({
+    required _i8.ReferralCode referralCode,
+    _i7.Key? key,
+    void Function(_i6.NavigationFailure)? onFailure,
+  }) async {
     return navigateTo(
-      const HomeViewRoute(),
+      HomeViewRoute(
+        referralCode: referralCode,
+        key: key,
+      ),
       onFailure: onFailure,
     );
   }
@@ -173,10 +206,16 @@ extension RouterStateExtension on _i5.RouterService {
     );
   }
 
-  Future<dynamic> replaceWithHomeView(
-      {void Function(_i6.NavigationFailure)? onFailure}) async {
+  Future<dynamic> replaceWithHomeView({
+    required _i8.ReferralCode referralCode,
+    _i7.Key? key,
+    void Function(_i6.NavigationFailure)? onFailure,
+  }) async {
     return replaceWith(
-      const HomeViewRoute(),
+      HomeViewRoute(
+        referralCode: referralCode,
+        key: key,
+      ),
       onFailure: onFailure,
     );
   }

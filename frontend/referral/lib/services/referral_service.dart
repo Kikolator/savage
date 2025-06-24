@@ -28,18 +28,24 @@ class ReferralService {
   /// Returns the created referral code.
   Future<ReferralCode> createReferralCode(
       String ownerId, String? companyId, String token) async {
-    _logger.i(
-        'Creating referral code for ownerId: $ownerId, companyId: $companyId, token: $token');
-    final referralCode = await _cloudFunctionService.callFunction<ReferralCode>(
-      functionName: 'createReferralCode',
-      converter: ReferralCode.fromMap,
-      data: {
-        'memberId': ownerId,
-        'companyId': companyId,
-        'token': token,
-      },
-    );
-    _logger.i('Referral code created: ${referralCode.documentId}');
-    return referralCode;
+    try {
+      _logger.i(
+          'Creating referral code for ownerId: $ownerId, companyId: $companyId, token: $token');
+      final referralCode =
+          await _cloudFunctionService.callFunction<ReferralCode>(
+        functionName: 'createReferralCode',
+        converter: ReferralCode.fromMap,
+        data: {
+          'memberId': ownerId,
+          'companyId': companyId,
+          'token': token,
+        },
+      );
+      _logger.i('Referral code created: ${referralCode.documentId}');
+      return referralCode;
+    } catch (e) {
+      // TODO: Handle this case.
+      rethrow;
+    }
   }
 }

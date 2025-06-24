@@ -1,36 +1,27 @@
-import 'package:referral/app/app.bottomsheets.dart';
 import 'package:referral/app/app.dialogs.dart';
 import 'package:referral/app/app.locator.dart';
-import 'package:referral/ui/common/app_strings.dart';
+import 'package:referral/data/referral_code.dart';
 import 'package:stacked/stacked.dart';
 import 'package:stacked_services/stacked_services.dart';
 
 class HomeViewModel extends BaseViewModel {
   final _dialogService = locator<DialogService>();
-  final _bottomSheetService = locator<BottomSheetService>();
 
-  String get counterLabel => 'Counter is: $_counter';
+  late ReferralCode _referralCode;
+  late Uri _referralCodeUri;
+  ReferralCode get referralCode => _referralCode;
 
-  int _counter = 0;
-
-  void incrementCounter() {
-    _counter++;
-    rebuildUi();
+  void initialise(ReferralCode referralCode) {
+    setBusy(true);
+    _referralCode = referralCode;
+    _referralCodeUri =
+        Uri.parse('https://savage-coworking.com/go/${_referralCode.code}');
+    setBusy(false);
   }
 
-  void showDialog() {
-    _dialogService.showCustomDialog(
-      variant: DialogType.infoAlert,
-      title: 'Stacked Rocks!',
-      description: 'Give stacked $_counter stars on Github',
-    );
-  }
-
-  void showBottomSheet() {
-    _bottomSheetService.showCustomSheet(
-      variant: BottomSheetType.notice,
-      title: ksHomeBottomSheetTitle,
-      description: ksHomeBottomSheetDescription,
-    );
+  /// Opens a dialog to choose a sharing method.
+  void shareReferralCode() async {
+    await _dialogService.showCustomDialog(
+        variant: DialogType.showQr, data: _referralCodeUri);
   }
 }

@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:responsive_builder/responsive_builder.dart';
+import 'package:referral/ui/common/ui_helpers.dart';
 import 'package:stacked/stacked.dart';
-
-import 'sign_up_view.desktop.dart';
-import 'sign_up_view.tablet.dart';
-import 'sign_up_view.mobile.dart';
 import 'sign_up_viewmodel.dart';
 
 class SignUpView extends StackedView<SignUpViewModel> {
@@ -18,26 +14,33 @@ class SignUpView extends StackedView<SignUpViewModel> {
   ) {
     return Scaffold(
       body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextButton(
-                onPressed: viewModel.signUp, child: const Text('Sign Up')),
-            Text('Member ID: ${viewModel.memberId}'),
-            Text('Company ID: ${viewModel.companyId}'),
-            Text('Token: ${viewModel.token}'),
-            if (viewModel.modelError != null) ...[
-              Text('Error: ${viewModel.modelError}'),
-            ]
-          ],
-        ),
+        child: viewModel.isBusy
+            ? const Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('Welcome to Savage Invite!'),
+                    Text('Press the button below to sign up'),
+                    verticalSpaceMedium,
+                    TextButton(
+                        onPressed: viewModel.signUp,
+                        child: const Text('Sign Up')),
+                    verticalSpaceSmall,
+                    if (viewModel.modelError != null) ...[
+                      Text('Error: ${viewModel.modelError}',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyLarge
+                              ?.copyWith(
+                                  color: Theme.of(context).colorScheme.error)),
+                    ],
+                    // TODO remove this
+                  ],
+                ),
+              ),
       ),
     );
-    // return ScreenTypeLayout.builder(
-    //   mobile: (_) => const SignUpViewMobile(),
-    //   tablet: (_) => const SignUpViewTablet(),
-    //   desktop: (_) => const SignUpViewDesktop(),
-    // );
   }
 
   @override

@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
+
 class Env {
-  static bool kLocalEmulatorMode = true;
+  static bool kLocalEmulatorMode = kDebugMode;
 
   static const String kLocalhost = 'localhost';
 

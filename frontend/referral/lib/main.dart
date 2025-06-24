@@ -34,6 +34,9 @@ class MainApp extends StatelessWidget {
       builder: (_) => MaterialApp.router(
         routerDelegate: stackedRouter.delegate(),
         routeInformationParser: stackedRouter.defaultRouteParser(),
+        theme: ThemeData.from(
+            colorScheme:
+                ColorScheme.fromSeed(seedColor: const Color(0xFF406835))),
       ),
     ).animate().fadeIn(
           delay: const Duration(milliseconds: 50),

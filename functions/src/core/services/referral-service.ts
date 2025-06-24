@@ -49,11 +49,11 @@ export class ReferralService {
         const officeRndService = this.params.officeRndService;
         const referrer = await officeRndService.getMember(params.referrerId);
         if (!referrer.properties.referralPermission) {
-            throw new AppError('Referrer does not have permission to create referral code', ErrorCode.INVALID_ARGUMENT, 400);
+            throw new AppError('Referrer does not have permission to create referral code', ErrorCode.REFERRAL_CODE_NO_PERMISSION, 400);
         }
 
         if (referrer.properties.referralOwnCode) {
-            throw new AppError('Referrer already has a referral code', ErrorCode.INVALID_ARGUMENT, 400);
+            throw new AppError('Referrer already has a referral code', ErrorCode.REFERRAL_CODE_ALREADY_EXISTS, 400);
         }
 
         let referralCode: ReferralCode | null = null;
