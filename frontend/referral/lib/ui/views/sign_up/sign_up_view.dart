@@ -17,26 +17,44 @@ class SignUpView extends StackedView<SignUpViewModel> {
         child: viewModel.isBusy
             ? const Center(child: CircularProgressIndicator())
             : SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('Welcome to Savage Invite!'),
-                    Text('Press the button below to sign up'),
-                    verticalSpaceMedium,
-                    TextButton(
-                        onPressed: viewModel.signUp,
-                        child: const Text('Sign Up')),
-                    verticalSpaceSmall,
-                    if (viewModel.modelError != null) ...[
-                      Text('Error: ${viewModel.modelError}',
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Welcome to Savage Invite!',
+                        style: Theme.of(context).textTheme.titleLarge,
+                        textAlign: TextAlign.center,
+                      ),
+                      Text(
+                        'Invite your friends to join Savage Coworking and earn up to 100% of your friends subscription plan as a discount or cashback.',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                        textAlign: TextAlign.center,
+                      ),
+                      Text(
+                        'Press the button below to get started.',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                        textAlign: TextAlign.center,
+                      ),
+                      verticalSpaceMedium,
+                      ElevatedButton(
+                          onPressed: viewModel.signUp,
+                          child: const Text('Sign Up')),
+                      verticalSpaceSmall,
+                      if (viewModel.modelError != null) ...[
+                        Text(
+                          viewModel.modelError,
                           style: Theme.of(context)
                               .textTheme
                               .bodyLarge
                               ?.copyWith(
-                                  color: Theme.of(context).colorScheme.error)),
+                                  color: Theme.of(context).colorScheme.error),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
                     ],
-                    // TODO remove this
-                  ],
+                  ),
                 ),
               ),
       ),

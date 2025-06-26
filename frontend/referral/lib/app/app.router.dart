@@ -33,7 +33,8 @@ class StackedRouterWeb extends _i6.RootStackRouter {
       );
     },
     HomeViewRoute.name: (routeData) {
-      final args = routeData.argsAs<HomeViewArgs>();
+      final args =
+          routeData.argsAs<HomeViewArgs>(orElse: () => const HomeViewArgs());
       return _i6.CustomPage<dynamic>(
         routeData: routeData,
         child: _i2.HomeView(
@@ -105,7 +106,7 @@ class StartupViewRoute extends _i6.PageRouteInfo<void> {
 /// [_i2.HomeView]
 class HomeViewRoute extends _i6.PageRouteInfo<HomeViewArgs> {
   HomeViewRoute({
-    required _i8.ReferralCode referralCode,
+    _i8.ReferralCode? referralCode,
     _i7.Key? key,
   }) : super(
           HomeViewRoute.name,
@@ -121,11 +122,11 @@ class HomeViewRoute extends _i6.PageRouteInfo<HomeViewArgs> {
 
 class HomeViewArgs {
   const HomeViewArgs({
-    required this.referralCode,
+    this.referralCode,
     this.key,
   });
 
-  final _i8.ReferralCode referralCode;
+  final _i8.ReferralCode? referralCode;
 
   final _i7.Key? key;
 
@@ -169,7 +170,7 @@ extension RouterStateExtension on _i5.RouterService {
   }
 
   Future<dynamic> navigateToHomeView({
-    required _i8.ReferralCode referralCode,
+    _i8.ReferralCode? referralCode,
     _i7.Key? key,
     void Function(_i6.NavigationFailure)? onFailure,
   }) async {
@@ -207,7 +208,7 @@ extension RouterStateExtension on _i5.RouterService {
   }
 
   Future<dynamic> replaceWithHomeView({
-    required _i8.ReferralCode referralCode,
+    _i8.ReferralCode? referralCode,
     _i7.Key? key,
     void Function(_i6.NavigationFailure)? onFailure,
   }) async {

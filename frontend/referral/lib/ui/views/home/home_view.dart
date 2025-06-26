@@ -10,8 +10,8 @@ import 'package:stacked/stacked.dart';
 import 'home_viewmodel.dart';
 
 class HomeView extends StackedView<HomeViewModel> {
-  final ReferralCode referralCode;
-  const HomeView({required this.referralCode, super.key});
+  final ReferralCode? referralCode;
+  const HomeView({this.referralCode, super.key});
 
   @override
   Widget builder(BuildContext context, HomeViewModel viewModel, Widget? child) {
@@ -23,12 +23,19 @@ class HomeView extends StackedView<HomeViewModel> {
                 padding: const EdgeInsets.all(10.0),
                 child: Column(children: [
                   verticalSpaceMedium,
+                  if (viewModel.modelError != null) ...[
+                    Text(
+                      viewModel.modelError,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: Theme.of(context).colorScheme.error),
+                    ),
+                  ],
                   Text(
                     'Savage Invite',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   Text(
-                    'Share your referral code with your friends to earn up to a 100% kick back!',
+                    'Share your referral code with your friends and start earning!',
                     style: Theme.of(context).textTheme.bodyMedium,
                     textAlign: TextAlign.center,
                   ),
@@ -67,7 +74,7 @@ class HomeView extends StackedView<HomeViewModel> {
                         Padding(
                           padding: const EdgeInsets.all(10.0),
                           child: Text(
-                            referralCode.totalReferred.toString(),
+                            referralCode!.totalReferred.toString(),
                             style: Theme.of(context).textTheme.displayMedium,
                           ),
                         ),
@@ -93,7 +100,7 @@ class HomeView extends StackedView<HomeViewModel> {
                             ],
                           ),
                         ),
-                        Text(referralCode.totalConverted.toString(),
+                        Text(referralCode!.totalConverted.toString(),
                             style: Theme.of(context).textTheme.displayMedium),
                       ],
                     ),
@@ -124,7 +131,7 @@ class HomeView extends StackedView<HomeViewModel> {
                           children: [
                             Text('€',
                                 style: Theme.of(context).textTheme.titleLarge),
-                            Text(referralCode.totalRewardedEur.toString(),
+                            Text(referralCode!.totalRewardedEur.toString(),
                                 style:
                                     Theme.of(context).textTheme.displayMedium),
                           ],

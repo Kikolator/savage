@@ -22,6 +22,7 @@ class SignUpViewModel extends BaseViewModel {
   String? get token => _token;
 
   initialise() {
+    _contextService.getReferralContext();
     _memberId = _contextService.memberId;
     _companyId = _contextService.companyId;
     _token = _contextService.token;

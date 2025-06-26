@@ -11,12 +11,20 @@ class HomeViewModel extends BaseViewModel {
   late Uri _referralCodeUri;
   ReferralCode get referralCode => _referralCode;
 
-  void initialise(ReferralCode referralCode) {
-    setBusy(true);
-    _referralCode = referralCode;
-    _referralCodeUri =
-        Uri.parse('https://savage-coworking.com/go/${_referralCode.code}');
-    setBusy(false);
+  void initialise(ReferralCode? referralCode) {
+    try {
+      setBusy(true);
+      if (referralCode == null) {
+        throw Exception('Referral code is null');
+      }
+      _referralCode = referralCode;
+      _referralCodeUri =
+          Uri.parse('https://savage-coworking.com/go/${_referralCode.code}');
+    } catch (error) {
+      setError(error.toString());
+    } finally {
+      setBusy(false);
+    }
   }
 
   /// Opens a dialog to choose a sharing method.
