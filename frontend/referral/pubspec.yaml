@@ -33,4 +33,4 @@ flutter:
   uses-material-design: true
 
 assets:
-  - assets/images/logo-dark.png
+  - images/logo-dark.png

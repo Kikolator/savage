@@ -19,38 +19,30 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="Savage Coworking Referral App">
+  <meta name="description" content="Savage Coworking Referral App.">
 
   <!-- iOS meta tags & icons -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="FilledStacks Academy">
+  <meta name="apple-mobile-web-app-title" content="Savage Referral">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png" />
+  <link rel="icon" type="image/png" href="favicon-light.png" />
 
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  
+
 
   <title>My Stacked Application</title>
   <link rel="manifest" href="manifest.json">
-
-  <script>
-    // The value below is injected by flutter build, do not touch.
-    var serviceWorkerVersion = null;
-  </script>
-  <!-- This script adds the flutter initialization JS code -->
-  <script src="flutter.js" defer></script>
 </head>
 
 <body>
   <style>
-    
     body {
-      background-color: #0A0A0A;
+      background-color: #F8FBF0;
       height: 100vh;
       width: 100vw;
       position: fixed;
@@ -87,7 +79,7 @@
       width: 250px;
       height: 250px;
       border-radius: 50%;
-      background: linear-gradient(#f07e6e, #84cdfa, #5ad1cd);
+      background: linear-gradient(#406835, #D7E8CC, #9FF798);
       animation: animate 1.2s linear infinite;
     }
 
@@ -106,7 +98,7 @@
       width: 100%;
       height: 100%;
       border-radius: 60%;
-      background: linear-gradient(#f07e6e, #84cdfa, #5ad1cd);
+      background: linear-gradient(#406835, #D7E8CC, #9FF798);
     }
 
     .loader span:nth-child(1) {
@@ -132,31 +124,11 @@
       left: 10px;
       right: 10px;
       bottom: 10px;
-      background: #191919;
+      background: #d5dac7;
       border-radius: 50%;
     }
   </style>
-  <script>
-    function delay(time) {
-      return new Promise(resolve => setTimeout(resolve, time));
-    }
-
-    window.addEventListener('load', function (ev) {
-      var loaderContent = document.querySelector('#loader-content');
-      // Download main.dart.js
-      _flutter.loader.loadEntrypoint({
-        serviceWorker: {
-          serviceWorkerVersion: serviceWorkerVersion,
-        }
-      }).then(function (engineInitializer) {
-        return engineInitializer.initializeEngine();
-      }).then(async function (appRunner) {
-        loaderContent.style.opacity = "0";
-        await delay(400);
-        await appRunner.runApp();
-      });
-    });
-  </script>
+  <script src="flutter_bootstrap.js" async></script>
   <div class="main-content" id="loader-content">
     <div class="loader">
       <span></span>

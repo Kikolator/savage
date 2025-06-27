@@ -51,7 +51,6 @@ class HomeView extends StackedView<HomeViewModel> {
                     label: const Text('Share Your Code'),
                   ),
                   const Divider(),
-                  // TODO referral dashboard
                   // Referrals send out
                   Card(
                     child: Column(

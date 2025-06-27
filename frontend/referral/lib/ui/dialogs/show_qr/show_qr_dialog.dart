@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:referral/ui/common/app_assets.dart';
 import 'package:stacked/stacked.dart';
 import 'package:stacked_services/stacked_services.dart';
 
@@ -62,7 +63,7 @@ class ShowQrDialog extends StackedView<ShowQrDialogModel> {
                 dataModuleShape: QrDataModuleShape.square,
               ),
               errorStateBuilder: (context, error) => Text(error.toString()),
-              embeddedImage: const AssetImage('assets/images/logo-dark.png'),
+              embeddedImage: const AssetImage(AppAssets.logoDark),
             ),
           ],
         ),
