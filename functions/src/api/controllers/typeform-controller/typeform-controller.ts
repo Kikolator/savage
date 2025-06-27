@@ -9,6 +9,7 @@ import { parseTypeformResponse } from './typeform-parser';
 import { logger } from 'firebase-functions';
 import { TrialdayService } from '../../../core/services/trialday-service';
 import { AppError, ErrorCode } from '../../../core/errors/app-error';
+import { isDevelopment } from '../../../core/utils/environment';
 
 class TypeformController implements Controller {
   private static readonly formHandlers: Map<
@@ -37,11 +38,21 @@ class TypeformController implements Controller {
   ) => {
     logger.info('TypeformController.handleWebhook: handling typeform webhook');
 
-    // First verify the typeform signature to ensure the request is legitimate
-    this.verifyTypeformSignature(
-      request.typeformSignature,
-      request.rawBody
-    );
+    // If in emulator mode, skip the signature verification
+    if (isDevelopment()) {
+      logger.info('TypeformController.handleWebhook: skipping signature verification in emulator mode');
+    } else {
+      this.verifyTypeformSignature(
+        request.typeformSignature,
+        request.rawBody
+      );
+    }
+
+    // // First verify the typeform signature to ensure the request is legitimate
+    // this.verifyTypeformSignature(
+    //   request.typeformSignature,
+    //   request.rawBody
+    // );
 
     const typeformData = request.body as TypeformResponse;
 

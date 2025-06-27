@@ -13,13 +13,13 @@ export class Referral {
     // The referral code used to refer the user.
     referralCode: string;
     // The start date of the trial day.
-    trialStartDate: Date | undefined;
+    trialStartDate: Date | null | undefined;
     // The start date of the membership.
-    membershipStartDate: Date | undefined;
+    membershipStartDate: Date | null | undefined;
     // The subscription value of the referred user.
-    subscriptionValue: number | undefined;
+    subscriptionValue: number | null | undefined;
     // The referral value of the referred user.
-    referralValue: number | undefined;
+    referralValue: number | null | undefined;
     // The status of the referral.
     status: ReferralStatus;
     // The rewards associated with the referral.
@@ -32,10 +32,10 @@ export class Referral {
         referrerType: ReferrerType;
         referredUserId: string;
         referralCode: string;
-        trialStartDate: Date | undefined;
-        membershipStartDate: Date | undefined;
-        subscriptionValue: number | undefined;
-        referralValue: number | undefined;
+        trialStartDate: Date | null | undefined;
+        membershipStartDate: Date | null | undefined;
+        subscriptionValue: number | null | undefined;
+        referralValue: number | null | undefined;
         status: ReferralStatus;
         rewardIds: string[];
     }) {

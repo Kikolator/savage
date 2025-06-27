@@ -126,21 +126,22 @@ export class ReferralService {
         subscriptionValue?: number,
         referralValue?: number,
     }): Promise<Referral> {
-        logger.info(['ReferralService.createReferral()- creating referral', {
-            referralCode: params.referralCode,
-            referredUserId: params.referredUserId,
-        }]);
         const firestoreService = this.params.firestoreService;
         const officeRndService = this.params.officeRndService;
         const referralCodesCollection = this.referralCodesCollection;
         const referralsCollection = this.referralsCollection;
-        const referralCode = params.referralCode;
+        const referralCode = params.referralCode.toUpperCase();
         const referredUserId = params.referredUserId;
         const isTrialday = params.isTrialday;
         const trialdayStartDate = params.trialdayStartDate;
         const membershipStartDate = params.membershipStartDate;
         const subscriptionValue = params.subscriptionValue;
         const referralValue = params.referralValue;
+
+        logger.info(['ReferralService.createReferral()- creating referral', {
+            referralCode: referralCode,
+            referredUserId: referredUserId,
+        }]);
 
         // If trial day, trial start date cannot be undefined.
         // If not trial day, trialdayStartDate must be undefined, and
@@ -176,13 +177,13 @@ export class ReferralService {
         // Use transaction to ensure atomicity and prevent data races
         const referral = await firestoreService.runTransaction(async (transaction) => {
             // Get the referral code object from firestore within the transaction
-            const referralCodeDocRef = firestoreService.getFirestoreInstance().collection(referralCodesCollection).doc(referralCode);
-            const referralCodeDoc = await transaction.get(referralCodeDocRef);
+            const referralCodeDocQuery = firestoreService.getFirestoreInstance().collection(referralCodesCollection).where('code', '==', referralCode);
+            const referralCodeSnapshot = await transaction.get(referralCodeDocQuery);
 
-            if (!referralCodeDoc.exists) {
-                throw new AppError('Referral code not found', ErrorCode.DOCUMENT_NOT_FOUND, 404);
+            if (referralCodeSnapshot.empty) {
+                throw new AppError('Referral code query is empty', ErrorCode.DOCUMENT_NOT_FOUND, 404);
             }
-
+            const referralCodeDoc = referralCodeSnapshot.docs[0];
             const referralCodeObject = ReferralCode.fromDocumentData(
                 referralCodeDoc.id,
                 referralCodeDoc.data()!
@@ -219,14 +220,14 @@ export class ReferralService {
             const referral = new Referral({
                 id: referralDocRef.id,
                 referrerId: referralCodeObject.ownerId,
-                referrerCompanyId: referralCodeObject.companyId,
+                referrerCompanyId: referralCodeObject.companyId || null,
                 referrerType: referralCodeObject.ownerType,
                 referredUserId: referredUserId,
                 referralCode: referralCode,
-                trialStartDate: trialdayStartDate,
-                membershipStartDate: membershipStartDate,
-                subscriptionValue: subscriptionValue,
-                referralValue: referralValue,
+                trialStartDate: trialdayStartDate || null,
+                membershipStartDate: membershipStartDate || null,
+                subscriptionValue: subscriptionValue || null,
+                referralValue: referralValue || null,
                 status: isTrialday ? ReferralStatus.TRIAL : ReferralStatus.AWAITING_PAYMENT,
                 rewardIds: [],
             });
@@ -240,6 +241,7 @@ export class ReferralService {
 
             // Update referral code object within the transaction using FieldValue operations
             // Use increment for totalReferred and arrayUnion for referredUsers
+            const referralCodeDocRef = firestoreService.getFirestoreInstance().collection(referralCodesCollection).doc(referralCodeDoc.id);
             transaction.update(referralCodeDocRef, {
                 totalReferred: firestoreService.getFieldValue().increment(1),
                 referredUsers: firestoreService.getFieldValue().arrayUnion(referredUserId),

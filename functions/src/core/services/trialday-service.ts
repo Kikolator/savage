@@ -17,6 +17,7 @@ import { officeRndConfig } from '../config/office-rnd-config';
 import { MailDataRequired } from '@sendgrid/mail';
 import { FirestoreService } from './firestore-service';
 import { ReferralService } from './referral-service';
+import { isDevelopment } from '../utils/environment';
 
 export class TrialdayService {
   private readonly trialDayRequestsCollection = 'trialDayRequests';
@@ -35,268 +36,286 @@ export class TrialdayService {
     logger.info(['TrialdayService.handleTrialdayRequest()- handling trialday request', {
       eventId: formData.eventId,
     }]);
-    // 0. Add to firestore.
-    await this.params.firestoreService.createDocument({
-      collection: this.trialDayRequestsCollection,
-      documentId: formData.eventId,
-      data: {
-        status: 'pending',
-        ...formData,
-      },
-    });
-    // 1. Set DateTime to UTC
-    // Set timezone and parse start date time
-    const dateTimeString = `${formData.preferredDate} ${formData.preferredTime}`;
-    // Parse the date string into a Date object
-    // Standard Date is UTC as set in index: porcess.env.TZ.
-    // Input date string is in Europe/Madrid (for now)
-    const inputStartDate = parse(dateTimeString, 'yyyy-MM-dd HH:mm', new Date());
-    // Convert input to utc timezone
-    const serverStartDate = fromZonedTime(inputStartDate, 'Europe/Madrid');
-    // TODO handle if timezone is provided in future versions.
-    if (formData.timezone) {
-      logger.warn('TrialdayService.handleTrialdayRequest()- timezone provided, but not used', {
-        timezone: formData.timezone,
+
+    try {
+      // 0. Add to firestore.
+      await this.params.firestoreService.createDocument({
+        collection: this.trialDayRequestsCollection,
+        documentId: formData.eventId,
+        data: {
+          status: 'pending',
+          ...formData,
+        },
       });
-    }
-    // Set end time to 18:00 Madrid time on the same day
-    // Madrid time will automatically handle DST transitions
-    // const madridEndDate = parse(
-    //   `${formData.preferredDate}T18:00`,
-    //   'yyyy-MM-dd\'T\'HH:mm',
-    //   new Date()
-    // );
-    // const serverEndDate = fromZonedTime(madridEndDate, 'Europe/Madrid');
-    // 2. Check if email is already a member
-    const members: Array<OfficeRndMember> =
-      await this.params.officeService.getMembersByEmail(formData.email);
-    let member: OfficeRndMember;
-    // Check only one member exists, and that member can book a trial day.
-    if (members.length == 1) {
-      member = members[0];
-      // Check member status.
-      if (
-        member.status !== OfficeRndMemberStatus.CONTACT &&
-        member.status !== OfficeRndMemberStatus.LEAD
-      ) {
-        // If member status is nor contact nor lead, send email to user he
-        // cannot book a trial day.
+      // 1. Set DateTime to UTC
+      // Set timezone and parse start date time
+      const dateTimeString = `${formData.preferredDate} ${formData.preferredTime}`;
+      // Parse the date string into a Date object
+      // Standard Date is UTC as set in index: porcess.env.TZ.
+      // Input date string is in Europe/Madrid (for now)
+      const inputStartDate = parse(dateTimeString, 'yyyy-MM-dd HH:mm', new Date());
+      // Convert input to utc timezone
+      const serverStartDate = fromZonedTime(inputStartDate, 'Europe/Madrid');
+      // TODO handle if timezone is provided in future versions.
+      if (formData.timezone) {
+        logger.warn('TrialdayService.handleTrialdayRequest()- timezone provided, but not used', {
+          timezone: formData.timezone,
+        });
+      }
+      // Set end time to 18:00 Madrid time on the same day
+      // Madrid time will automatically handle DST transitions
+      // const madridEndDate = parse(
+      //   `${formData.preferredDate}T18:00`,
+      //   'yyyy-MM-dd\'T\'HH:mm',
+      //   new Date()
+      // );
+      // const serverEndDate = fromZonedTime(madridEndDate, 'Europe/Madrid');
+      // 2. Check if email is already a member
+      const members: Array<OfficeRndMember> =
+        await this.params.officeService.getMembersByEmail(formData.email);
+      let member: OfficeRndMember;
+      // Check only one member exists, and that member can book a trial day.
+      if (members.length == 1) {
+        member = members[0];
+        // Check member status.
+        if (
+          member.status !== OfficeRndMemberStatus.CONTACT &&
+          member.status !== OfficeRndMemberStatus.LEAD
+        ) {
+          // If member status is nor contact nor lead, send email to user he
+          // cannot book a trial day.
+          throw new AppError(
+            'TrialdayService.handleTrialdayRequest()- Membership status does not allow to book a trial day.',
+            ErrorCode.TRIALDAY_MEMBER_NOT_ALLOWED,
+            403,
+            {
+              memberEmail: formData.email,
+              memberStatus: member.status,
+            }
+          );
+        } else if (
+          member.status === OfficeRndMemberStatus.LEAD &&
+          member.properties.trialdayCompleted
+        ) {
+          // if member status is lead, and completed trial day, user cannot
+          // book trial.
+          throw new AppError(
+            'TrialdayService.handleTrialdayRequest()- Member has already completed a trial day.',
+            ErrorCode.TRIALDAY_ALREADY_COMPLETED,
+            403,
+            { memberEmail: formData.email },
+          );
+        }
+      } else if (members.length == 0) {
+        // No members in Array so create a new one.
+        const now = new Date();
+        const newMember: OfficeRndNewMember = {
+          email: formData.email,
+          name: `${formData.firstName} ${formData.lastName}`,
+          location: officeRndConfig.defaultLocationId,
+          startDate: now,
+          description: '',
+          properties: {
+            trialdayCompleted: false,
+            phoneNumber: formData.phoneNumber,
+            interest: formData.interest,
+            reason: formData.reason,
+          },
+        };
+        member = await this.params.officeService.createMember(newMember);
+      } else {
+        // If more than one member exists with same email, throw error.
         throw new AppError(
-          'TrialdayService.handleTrialdayRequest()- Membership status does not allow to book a trial day.',
-          ErrorCode.TRIALDAY_MEMBER_NOT_ALLOWED,
-          403,
-          {
-            memberEmail: formData.email,
-            memberStatus: member.status,
-          }
+          'TrialdayService.handleTrialdayRequest()- More than one member exists for email.',
+          ErrorCode.OFFICE_RND_MULTIPLE_MEMBERS_FOUND,
+          404,
+          { memberEmail: formData.email },
         );
-      } else if (
-        member.status === OfficeRndMemberStatus.LEAD &&
-        member.properties.trialdayCompleted
-      ) {
-        // if member status is lead, and completed trial day, user cannot
-        // book trial.
+        // TODO handle multiple office rnd accounts with same email error.
+      }
+      // 3. Add Opportunity to member.
+      // get the opportunity statusses.
+      const trialRequestStatusses = await this
+        .params
+        .officeService
+        .getOpportunityStatuses();
+      // get the trial request status.
+      const trialRequestStatus = trialRequestStatusses.find(
+        (status) => status._id === '682200cd47119167b0c24e9a'
+      );
+      if (!trialRequestStatus) {
         throw new AppError(
-          'TrialdayService.handleTrialdayRequest()- Member has already completed a trial day.',
-          ErrorCode.TRIALDAY_ALREADY_COMPLETED,
-          403,
+          'TrialdayService.handleTrialdayRequest()- Trial Request status not found.',
+          ErrorCode.TRIALDAY_STATUS_NOT_FOUND,
+          404,
           { memberEmail: formData.email },
         );
       }
-    } else if (members.length == 0) {
-      // No members in Array so create a new one.
-      const now = new Date();
-      const newMember: OfficeRndNewMember = {
-        email: formData.email,
-        name: `${formData.firstName} ${formData.lastName}`,
-        location: officeRndConfig.defaultLocationId,
-        startDate: now,
-        description: '',
+      // Because we cannot update the opportunity probability,
+      // We'll create a new oppportuntiy for each request,
+      // this way we'll also retain data.
+      // TODO add requested plans to opportunity.
+      await this.params.officeService.createOpportunity({
+        name: `${formData.firstName} ${formData.lastName} - TRIAL DAY`,
+        member: member._id,
+        status: trialRequestStatus._id,
+        probability: trialRequestStatus.probability,
+        startDate: serverStartDate,
         properties: {
-          trialdayCompleted: false,
-          phoneNumber: formData.phoneNumber,
-          interest: formData.interest,
+          trialdayDate: serverStartDate,
+          interestedIn: formData.interest,
           reason: formData.reason,
         },
-      };
-      member = await this.params.officeService.createMember(newMember);
-    } else {
-      // If more than one member exists with same email, throw error.
-      throw new AppError(
-        'TrialdayService.handleTrialdayRequest()- More than one member exists for email.',
-        ErrorCode.OFFICE_RND_MULTIPLE_MEMBERS_FOUND,
-        404,
-        { memberEmail: formData.email },
-      );
-      // TODO handle multiple office rnd accounts with same email error.
-    }
-    // 3. Add Opportunity to member.
-    // get the opportunity statusses.
-    const trialRequestStatusses = await this
-      .params
-      .officeService
-      .getOpportunityStatuses();
-    // get the trial request status.
-    const trialRequestStatus = trialRequestStatusses.find(
-      (status) => status._id === '682200cd47119167b0c24e9a'
-    );
-    if (!trialRequestStatus) {
-      throw new AppError(
-        'TrialdayService.handleTrialdayRequest()- Trial Request status not found.',
-        ErrorCode.TRIALDAY_STATUS_NOT_FOUND,
-        404,
-        { memberEmail: formData.email },
-      );
-    }
-    // Because we cannot update the opportunity probability,
-    // We'll create a new oppportuntiy for each request,
-    // this way we'll also retain data.
-    // TODO add requested plans to opportunity.
-    await this.params.officeService.createOpportunity({
-      name: `${formData.firstName} ${formData.lastName} - TRIAL DAY`,
-      member: member._id,
-      status: trialRequestStatus._id,
-      probability: trialRequestStatus.probability,
-      startDate: serverStartDate,
-      properties: {
-        trialdayDate: serverStartDate,
-        interestedIn: formData.interest,
-        reason: formData.reason,
-      },
-    });
-    // 4. Book a free desk for member without notification.
-    // TODO add desk booking.
-    // 5. Create calendar event
-    // const calendarEvent = await this.params.calendarService.createEvent({
-    //   summary: `${formData.firstName} ${formData.lastName} - Trial Day`,
-    //   description: `Trial day for ${formData.firstName} ${formData.lastName}\n\nInterest: ${formData.interest.join(', ')}\nReason: ${formData.reason}`,
-    //   start: {
-    //     dateTime: serverStartDate.toISOString(),
-    //     timeZone: 'Europe/Madrid',
-    //   },
-    //   end: {
-    //     dateTime: serverEndDate.toISOString(),
-    //     timeZone: 'Europe/Madrid',
-    //   },
-    //   attendees: [
-    //     {
-    //       email: formData.email,
-    //       displayName: `${formData.firstName} ${formData.lastName}`,
-    //     },
-    //     {
-    //       email: 'hub@savage-coworking.com',
-    //       displayName: 'Savage Coworking',
-    //     },
-    //   ],
-    //   reminders: {
-    //     useDefault: true,
-    //   },
-    // });
-    // get custom fields from firestore (location, membership_status, trial_start_date, referrer_email, newsletter_opt_in, signup_source).
-    const customFieldsQuery = await this
-      .params
-      .firestoreService
-      .getCollection(
-        'sendgrid/metadata/customFields',
-      );
-    const customFields: { [key: string]: string } = {};
-    customFieldsQuery.map((item) => {
-      switch (item.name) {
-        case 'location':
-          customFields[item.id] = 'Estepona, Spain';
-          break;
-        case 'membership_status':
-          customFields[item.id] = 'lead';
-          break;
-        case 'trial_start_date':
-          customFields[item.id] = serverStartDate.toDateString();
-          break;
-        case 'referrer_code':
-          customFields[item.id] = formData.referralCode || '';
-          break;
-        case 'newsletter_opt_in':
-          customFields[item.id] = 'true';
-          break;
-        case 'signup_source':
-          customFields[item.id] = formData.utmSource || 'trialday-form';
-          break;
-        default:
-          break;
-      }
-    });
-    // Create new contact object.
-    const newContact: SendgridContactRequest = {
-      email: formData.email,
-      first_name: formData.firstName,
-      last_name: formData.lastName,
-      phone_number_id: formData.phoneNumber,
-      custom_fields: customFields,
-    };
-    // query sendgrid metadata collection for lead list id.
-    const LeadListQuery = await this.params.firestoreService.queryCollection(
-      'sendgrid/metadata/lists',
-      [{
-        field: 'name',
-        operator: '==',
-        value: 'leads',
-      }]);
-    if (LeadListQuery.length === 0) {
-      throw new AppError(
-        'TrialdayService.handleTrialdayRequest()- Lead list not found.',
-        ErrorCode.SENDGRID_LIST_NOT_FOUND,
-        404,
-        { memberEmail: formData.email },
-      );
-    }
-    if (LeadListQuery.length > 1) {
-      throw new AppError(
-        'TrialdayService.handleTrialdayRequest()- Multiple lead lists found.',
-        ErrorCode.SENDGRID_MULTIPLE_LISTS_FOUND,
-        404,
-        { memberEmail: formData.email },
-      );
-    }
-    const leadList = LeadListQuery[0] as SendgridList;
-    // Add contact to Sendgrid.
-    await this.params.sendgridService.addContacts(
-      [leadList.id],
-      [newContact]);
-    // Build mail data.
-    const mailData: MailDataRequired = {
-      from: {
-        email: 'hub@savage-coworking.com', // sending email
-        name: 'Savage Coworking', // company name
-      },
-      to: formData.email,
-      templateId: 'd-25105204bd734ff49bcfb6dbd3ce4deb',
-      dynamicTemplateData: {
-        first_name: formData.firstName,
-        last_name: formData.lastName,
-        trial_date: format(toZonedTime(serverStartDate, 'Europe/Madrid'), 'EEEE, \'the\' do \'of\' MMMM yyyy'),
-        trial_start_time: format(toZonedTime(serverStartDate, 'Europe/Madrid'), 'h:mm a'),
-      },
-    };
-    // Send confirmation email.
-    await this.params.sendgridService.mailSend(
-      mailData
-    );
-    // update trial day request status to confirmation-email-sent.
-    await this.params.firestoreService.updateDocument({
-      collection: this.trialDayRequestsCollection,
-      documentId: formData.eventId,
-      data: {
-        status: 'confirmation-email-sent',
-      },
-    });
-    // 6. Add referral code to referral service.
-    if (formData.referralCode) {
-      await this.params.referralService.createReferral({
-        referralCode: formData.referralCode,
-        referredUserId: member._id,
-        referrerCompanyId: member.company,
-        isTrialday: true,
-        trialdayStartDate: serverStartDate,
       });
+      // 4. Book a free desk for member without notification.
+      // TODO add desk booking.
+      // 5. Create calendar event
+      // const calendarEvent = await this.params.calendarService.createEvent({
+      //   summary: `${formData.firstName} ${formData.lastName} - Trial Day`,
+      //   description: `Trial day for ${formData.firstName} ${formData.lastName}\n\nInterest: ${formData.interest.join(', ')}\nReason: ${formData.reason}`,
+      //   start: {
+      //     dateTime: serverStartDate.toISOString(),
+      //     timeZone: 'Europe/Madrid',
+      //   },
+      //   end: {
+      //     dateTime: serverEndDate.toISOString(),
+      //     timeZone: 'Europe/Madrid',
+      //   },
+      //   attendees: [
+      //     {
+      //       email: formData.email,
+      //       displayName: `${formData.firstName} ${formData.lastName}`,
+      //     },
+      //     {
+      //       email: 'hub@savage-coworking.com',
+      //       displayName: 'Savage Coworking',
+      //     },
+      //   ],
+      //   reminders: {
+      //     useDefault: true,
+      //   },
+      // });
+
+      // Don't call sendgrid if in development mode.
+      if (!isDevelopment()) {
+        // get custom fields from firestore (location, membership_status, trial_start_date, referrer_email, newsletter_opt_in, signup_source).
+        const customFieldsQuery = await this
+          .params
+          .firestoreService
+          .getCollection(
+            'sendgrid/metadata/customFields',
+          );
+        const customFields: { [key: string]: string } = {};
+        customFieldsQuery.map((item) => {
+          switch (item.name) {
+            case 'location':
+              customFields[item.id] = 'Estepona, Spain';
+              break;
+            case 'membership_status':
+              customFields[item.id] = 'lead';
+              break;
+            case 'trial_start_date':
+              customFields[item.id] = serverStartDate.toDateString();
+              break;
+            case 'referrer_code':
+              customFields[item.id] = formData.referralCode || '';
+              break;
+            case 'newsletter_opt_in':
+              customFields[item.id] = 'true';
+              break;
+            case 'signup_source':
+              customFields[item.id] = formData.utmSource || 'trialday-form';
+              break;
+            default:
+              break;
+          }
+        });
+        // Create new contact object.
+        const newContact: SendgridContactRequest = {
+          email: formData.email,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          phone_number_id: formData.phoneNumber,
+          custom_fields: customFields,
+        };
+        // query sendgrid metadata collection for lead list id.
+        const LeadListQuery = await this.params.firestoreService.queryCollection(
+          'sendgrid/metadata/lists',
+          [{
+            field: 'name',
+            operator: '==',
+            value: 'leads',
+          }]);
+        if (LeadListQuery.length === 0) {
+          throw new AppError(
+            'TrialdayService.handleTrialdayRequest()- Lead list not found.',
+            ErrorCode.SENDGRID_LIST_NOT_FOUND,
+            404,
+            { memberEmail: formData.email },
+          );
+        }
+        if (LeadListQuery.length > 1) {
+          throw new AppError(
+            'TrialdayService.handleTrialdayRequest()- Multiple lead lists found.',
+            ErrorCode.SENDGRID_MULTIPLE_LISTS_FOUND,
+            404,
+            { memberEmail: formData.email },
+          );
+        }
+        const leadList = LeadListQuery[0] as SendgridList;
+        // Add contact to Sendgrid.
+        await this.params.sendgridService.addContacts(
+          [leadList.id],
+          [newContact]);
+        // Build mail data.
+        const mailData: MailDataRequired = {
+          from: {
+            email: 'hub@savage-coworking.com', // sending email
+            name: 'Savage Coworking', // company name
+          },
+          to: formData.email,
+          templateId: 'd-25105204bd734ff49bcfb6dbd3ce4deb',
+          dynamicTemplateData: {
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+            trial_date: format(toZonedTime(serverStartDate, 'Europe/Madrid'), 'EEEE, \'the\' do \'of\' MMMM yyyy'),
+            trial_start_time: format(toZonedTime(serverStartDate, 'Europe/Madrid'), 'h:mm a'),
+          },
+        };
+        // Send confirmation email.
+        await this.params.sendgridService.mailSend(
+          mailData
+        );
+      }
+
+      // update trial day request status to confirmation-email-sent.
+      await this.params.firestoreService.updateDocument({
+        collection: this.trialDayRequestsCollection,
+        documentId: formData.eventId,
+        data: {
+          status: 'confirmation-email-sent',
+        },
+      });
+      // 6. Add referral code to referral service.
+      if (formData.referralCode) {
+        await this.params.referralService.createReferral({
+          referralCode: formData.referralCode,
+          referredUserId: member._id,
+          referrerCompanyId: member.company,
+          isTrialday: true,
+          trialdayStartDate: serverStartDate,
+        });
+      }
+    } catch (error) {
+      // update firestore status to error.
+      await this.params.firestoreService.updateDocument({
+        collection: this.trialDayRequestsCollection,
+        documentId: formData.eventId,
+        data: {
+          status: 'error',
+        },
+      });
+      throw error;
     }
   }
 }
