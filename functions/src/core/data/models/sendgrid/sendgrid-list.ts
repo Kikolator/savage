@@ -1,5 +1,5 @@
 export interface SendgridList {
-    id: string;
-    name: string;
-    contactCount: number;
+  id: string;
+  name: string;
+  contactCount: number;
 }

@@ -1,15 +1,16 @@
-import { RequestHandler, Router } from 'express';
-import { logger } from 'firebase-functions';
-import { AppError } from '../../core/errors/app-error';
+import {RequestHandler, Router} from 'express';
+import {logger} from 'firebase-functions';
+
+import {AppError} from '../../core/errors/app-error';
 
 export interface Controller {
-    initialize(httpServer: HttpServer) : void;
+  initialize(httpServer: HttpServer): void;
 }
 
 export class HttpServer {
   private router: Router;
 
-  constructor( public readonly app: Router) {
+  constructor(public readonly app: Router) {
     this.router = app;
   }
 
@@ -38,7 +39,6 @@ export class HttpServer {
     return versionedRouter;
   }
 
-
   // Add method to use middleware on specific routes
   useMiddleware(path: string, middleware: RequestHandler): void {
     this.router.use(path, middleware);
@@ -51,17 +51,11 @@ export class HttpServer {
       } catch (error: unknown) {
         logger.error('HttpServer._catchErrorHandler()-', error);
         if (error instanceof AppError) {
-          res.status(error.status || 500).json({
-            message: error.message,
-          });
+          res.status(error.status || 500).json({message: error.message});
         } else if (error instanceof Error) {
-          res.status(500).json({
-            message: error.message,
-          });
+          res.status(500).json({message: error.message});
         } else {
-          res.status(500).json({
-            message: 'Internal Server Error',
-          });
+          res.status(500).json({message: 'Internal Server Error'});
         }
       }
     };

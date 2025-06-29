@@ -1,11 +1,10 @@
 export {};
 
 declare global {
-    namespace Express {
-        interface Request {
-            typeformSignature?: string;
-            rawBody?: Buffer;
-        }
+  namespace Express {
+    interface Request {
+      typeformSignature?: string;
+      rawBody?: Buffer;
     }
+  }
 }
-

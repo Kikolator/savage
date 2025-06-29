@@ -1,9 +1,11 @@
 // Sendgrid imports
-import { Client } from '@sendgrid/client';
-import { ClientResponse, MailService } from '@sendgrid/mail';
-import { MailDataRequired } from '@sendgrid/helpers/classes/mail';
-import { ClientRequest } from '@sendgrid/client/src/request';
+import {Client} from '@sendgrid/client';
+import {ClientRequest} from '@sendgrid/client/src/request';
+import {ClientResponse, MailService} from '@sendgrid/mail';
+import {MailDataRequired} from '@sendgrid/helpers/classes/mail';
 // Project imports
+import {logger} from 'firebase-functions';
+
 import {
   SendgridContactRequest,
   SendgridCustomField,
@@ -11,9 +13,8 @@ import {
   SendgridList,
   SendgridListResponse,
 } from '../data/models';
-import { logger } from 'firebase-functions';
-import { AppError, ErrorCode } from '../errors/app-error';
-import { firebaseSecrets } from '../config/firebase-secrets';
+import {AppError, ErrorCode} from '../errors/app-error';
+import {firebaseSecrets} from '../config/firebase-secrets';
 
 export class SendgridService {
   private apiKey: string | null = null;
@@ -51,7 +52,10 @@ export class SendgridService {
     logger.info('SendgridService.getCustomFields()- Getting custom fields');
     this.initialize();
     if (!this.client) {
-      throw new AppError('Sendgrid client not initialized', ErrorCode.UNKNOWN_ERROR);
+      throw new AppError(
+        'Sendgrid client not initialized',
+        ErrorCode.UNKNOWN_ERROR
+      );
     }
     const request: ClientRequest = {
       url: '/v3/marketing/field_definitions',
@@ -59,7 +63,9 @@ export class SendgridService {
     };
     const [response, body] = await this.client.request(request);
     if (response.statusCode !== 200) {
-      throw new Error(`Error getting Sendgrid custom fields: ${response.statusCode} ${response.body}`);
+      throw new Error(
+        `Error getting Sendgrid custom fields: ${response.statusCode} ${response.body}`
+      );
     }
     const customFields: Array<SendgridCustomField> = [];
     body.custom_fields.forEach((field: SendgridCustomFieldResponse) => {
@@ -76,7 +82,10 @@ export class SendgridService {
     logger.info('SendgridService.getLists()- Getting lists');
     this.initialize();
     if (!this.client) {
-      throw new AppError('Sendgrid client not initialized', ErrorCode.UNKNOWN_ERROR);
+      throw new AppError(
+        'Sendgrid client not initialized',
+        ErrorCode.UNKNOWN_ERROR
+      );
     }
     const request: ClientRequest = {
       url: '/v3/marketing/lists',
@@ -84,7 +93,9 @@ export class SendgridService {
     };
     const [response, body] = await this.client.request(request);
     if (response.statusCode !== 200) {
-      throw new Error(`Error getting Sendgrid lists: ${response.statusCode} ${response.body}`);
+      throw new Error(
+        `Error getting Sendgrid lists: ${response.statusCode} ${response.body}`
+      );
     }
     const lists: Array<SendgridList> = [];
     body.result.forEach((list: SendgridListResponse) => {
@@ -104,7 +115,10 @@ export class SendgridService {
     logger.info('SendgridService.addContact()- Adding contact');
     this.initialize();
     if (!this.client) {
-      throw new AppError('Sendgrid client not initialized', ErrorCode.UNKNOWN_ERROR);
+      throw new AppError(
+        'Sendgrid client not initialized',
+        ErrorCode.UNKNOWN_ERROR
+      );
     }
     const request: ClientRequest = {
       url: '/v3/marketing/contacts',
@@ -116,7 +130,9 @@ export class SendgridService {
     };
     const [response, body] = await this.client.request(request);
     if (response.statusCode !== 202) {
-      throw new Error(`Error adding Sendgrid contact: ${response.statusCode} ${response.body}`);
+      throw new Error(
+        `Error adding Sendgrid contact: ${response.statusCode} ${response.body}`
+      );
     }
     return body;
   }
@@ -126,21 +142,26 @@ export class SendgridService {
   // email addresses.
   public async mailSend(
     mailData: MailDataRequired,
-    isMultiple = false,
+    isMultiple = false
   ): Promise<void> {
     logger.info('SendgridService.mailSend()- Sending email');
     this.initialize();
     if (!this.mail) {
-      throw new AppError('Sendgrid mail service not initialized', ErrorCode.UNKNOWN_ERROR);
+      throw new AppError(
+        'Sendgrid mail service not initialized',
+        ErrorCode.UNKNOWN_ERROR
+      );
     }
     // Send the email(s)
-    const response: [ClientResponse, object] =
-      await this.mail.send(mailData, isMultiple);
+    const response: [ClientResponse, object] = await this.mail.send(
+      mailData,
+      isMultiple
+    );
     // Check the response
     if (response[0].statusCode !== 202) {
       throw new AppError(
         `Error sending Sendgrid mail: ${response[0].statusCode} ${response[0].body}`,
-        ErrorCode.SENDGRID_MAIL_SEND_FAILED,
+        ErrorCode.SENDGRID_MAIL_SEND_FAILED
       );
     }
     return;

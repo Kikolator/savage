@@ -1,6 +1,8 @@
-import { logger } from 'firebase-functions';
-import { TypeformAnswer, TypeformResponse } from '../../../core/data/models';
-import { getTypeformMapping, TypeformTypes } from './typeform-mappings';
+import {logger} from 'firebase-functions';
+
+import {TypeformAnswer, TypeformResponse} from '../../../core/data/models';
+
+import {getTypeformMapping, TypeformTypes} from './typeform-mappings';
 
 const getAnswers = (response: TypeformResponse): TypeformAnswer[] => {
   return response.form_response.answers;
@@ -32,7 +34,8 @@ const getChoiceLabel = (answers: TypeformAnswer[], fieldId: string): string => {
 };
 
 const getChoiceLabels = (
-  answers: TypeformAnswer[], fieldId: string
+  answers: TypeformAnswer[],
+  fieldId: string
 ): string[] => {
   const answer = findAnswer(answers, fieldId);
   return answer?.choices?.labels || [];

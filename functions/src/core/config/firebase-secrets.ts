@@ -1,4 +1,4 @@
-import { defineSecret } from 'firebase-functions/params';
+import {defineSecret} from 'firebase-functions/params';
 
 interface FirebaseSecrets {
   sendgridApiKey: ReturnType<typeof defineSecret>;
