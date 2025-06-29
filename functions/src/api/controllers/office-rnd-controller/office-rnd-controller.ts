@@ -3,6 +3,7 @@ import { Controller, HttpServer } from '..';
 import { RequestHandler } from 'express';
 import { firebaseSecrets } from '../../../core/config/firebase-secrets';
 import { AppError, ErrorCode } from '../../../core/errors/app-error';
+import crypto from 'crypto';
 
 class OfficeRndController implements Controller {
   initialize(httpServer: HttpServer): void {
@@ -16,17 +17,65 @@ class OfficeRndController implements Controller {
     next,
   ) => {
     logger.info('OfficeRndController.handleWebhook: handling office rnd webhook',
-                {
-                  body: request.body,
-                }
+      {
+        body: request.body,
+      }
     );
-    response.status(503).json({
-      status: 'error',
-      message: 'Service temporarily unavailable - under construction',
-      code: 'SERVICE_UNAVAILABLE',
-    });
+    const { body, rawBody, headers } = request;
+
+    // Verify the signature
+    const officeRndSignature = headers['officernd-signature'] as string;
+    this.verifyOfficeRndSignature(rawBody, officeRndSignature);
+
+    // Send 200 OK response to OfficeRnd first
+    response.status(200).send('OK');
+
+
+    const { eventType, data } = body;
+
+    switch (eventType) {
+      case 'membership.created':
+        logger.info('OfficeRndController.handleWebhook: membership created', { data });
+        break;
+      case 'membership.updated':
+        logger.info('OfficeRndController.handleWebhook: membership updated', { data });
+        break;
+      case 'membership.removed':
+        logger.info('OfficeRndController.handleWebhook: membership removed', { data });
+        break;
+      default:
+        logger.error('OfficeRndController.handleWebhook: unknown event type', { eventType });
+        throw new AppError('OfficeRndController.handleWebhook: unknown event type', ErrorCode.OFFICERND_UNKNOWN_EVENT, 500);
+    }
     next();
   };
+
+  private verifyOfficeRndSignature(
+    rawBody: Buffer | undefined,
+    officeRndSignature: string | undefined
+  ): void {
+    if (!officeRndSignature) {
+      throw new AppError('OfficeRndController.handleWebhook: no office rnd signature found', ErrorCode.OFFICERND_WEBHOOK_INVALID_SIGNATURE, 401);
+    }
+
+    const webhookSecret = firebaseSecrets.officeRndWebhookSecret.value();
+
+    const signatureHeaderParts = officeRndSignature.split(',');
+    const timestampParts = signatureHeaderParts[0].split('=');
+    const signatureParts = signatureHeaderParts[1].split('=');
+
+    const timestamp = timestampParts[1];
+    const signature = signatureParts[1];
+
+    const payloadToSign = rawBody + '.' + timestamp;
+    const mySignature = crypto.createHmac('sha256', webhookSecret)
+      .update(payloadToSign)
+      .digest('hex');
+
+    if (mySignature !== signature) {
+      throw new AppError('OfficeRndController.handleWebhook: invalid signature', ErrorCode.OFFICERND_WEBHOOK_INVALID_SIGNATURE, 401);
+    }
+  }
 
   // Initialize the OfficeRnd service.
   // ONLY CALL THIS ONCE.
