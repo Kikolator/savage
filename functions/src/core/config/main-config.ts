@@ -1,3 +1,1 @@
-export const mainConfig = {
-  cloudFunctionsLocation: 'europe-west1',
-};
+export const mainConfig = {cloudFunctionsLocation: 'europe-west1'};

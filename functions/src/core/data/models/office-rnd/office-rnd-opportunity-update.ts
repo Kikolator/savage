@@ -1,8 +1,8 @@
-import { OfficeRndOpportunityProperties } from '..';
+import {OfficeRndOpportunityProperties} from '..';
 
 export interface OfficeRndOpportunityUpdate {
-    properties?: OfficeRndOpportunityProperties;
-    name?: string;
-    startDate?: Date;
-    status?: string;
+  properties?: OfficeRndOpportunityProperties;
+  name?: string;
+  startDate?: Date;
+  status?: string;
 }

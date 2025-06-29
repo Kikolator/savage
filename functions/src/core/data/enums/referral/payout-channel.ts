@@ -1,5 +1,5 @@
 export enum PayoutChannel {
-    OFFICERND = 'officeRnd',
-    STRIPE = 'stripe',
-    MANUAL = 'manual',
+  OFFICERND = 'officeRnd',
+  STRIPE = 'stripe',
+  MANUAL = 'manual',
 }

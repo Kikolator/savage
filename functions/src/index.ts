@@ -1,10 +1,11 @@
-import { initializeApp } from 'firebase-admin/app';
-import { scheduledEvents } from './scheduled-events';
-import { onRequest } from 'firebase-functions/v2/https';
-import { mainConfig } from './core/config/main-config';
+import {initializeApp} from 'firebase-admin/app';
+import {onRequest} from 'firebase-functions/v2/https';
+
+import {scheduledEvents} from './scheduled-events';
+import {mainConfig} from './core/config/main-config';
 import apiApp from './api';
-import { firebaseSecrets } from './core/config/firebase-secrets';
-import { callableFunctions } from './app-functions';
+import {firebaseSecrets} from './core/config/firebase-secrets';
+import {callableFunctions} from './app-functions';
 
 // Set timezone to UTC
 process.env.TZ = 'UTC';
@@ -22,7 +23,7 @@ exports.api = onRequest(
       firebaseSecrets.sendgridApiKey,
     ],
   },
-  apiApp,
+  apiApp
 );
 
 // Scheduled functions

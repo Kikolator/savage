@@ -1,19 +1,24 @@
-import { RequestHandler } from 'express';
-import { Controller, HttpServer } from '..';
-// import { FirestoreService } from '../../../core/services/firestore-service';
-import { TYPEFORM_IDS } from '../../../core/config/typeform-ids';
 import * as crypto from 'crypto';
-import { firebaseSecrets } from '../../../core/config/firebase-secrets';
-import { TrialDayFormData, TypeformResponse } from '../../../core/data/models';
-import { parseTypeformResponse } from './typeform-parser';
-import { logger } from 'firebase-functions';
-import { TrialdayService } from '../../../core/services/trialday-service';
-import { AppError, ErrorCode } from '../../../core/errors/app-error';
-import { isDevelopment } from '../../../core/utils/environment';
+
+import {RequestHandler} from 'express';
+import {logger} from 'firebase-functions';
+
+import {Controller, HttpServer} from '..';
+// import { FirestoreService } from '../../../core/services/firestore-service';
+import {TYPEFORM_IDS} from '../../../core/config/typeform-ids';
+import {firebaseSecrets} from '../../../core/config/firebase-secrets';
+import {TrialDayFormData, TypeformResponse} from '../../../core/data/models';
+import {TrialdayService} from '../../../core/services/trialday-service';
+import {AppError, ErrorCode} from '../../../core/errors/app-error';
+import {isDevelopment} from '../../../core/utils/environment';
+
+import {parseTypeformResponse} from './typeform-parser';
 
 class TypeformController implements Controller {
   private static readonly formHandlers: Map<
-    string, (data: TypeformResponse) => Promise<void>> = new Map();
+    string,
+    (data: TypeformResponse) => Promise<void>
+  > = new Map();
 
   constructor(
     private readonly params: {
@@ -31,21 +36,16 @@ class TypeformController implements Controller {
     httpServer.post('/webhook/typeform', this.handleWebhook.bind(this));
   }
 
-  private handleWebhook: RequestHandler = async (
-    request,
-    response,
-    next,
-  ) => {
+  private handleWebhook: RequestHandler = async (request, response, next) => {
     logger.info('TypeformController.handleWebhook: handling typeform webhook');
 
     // If in emulator mode, skip the signature verification
     if (isDevelopment()) {
-      logger.info('TypeformController.handleWebhook: skipping signature verification in emulator mode');
-    } else {
-      this.verifyTypeformSignature(
-        request.typeformSignature,
-        request.rawBody
+      logger.info(
+        'TypeformController.handleWebhook: skipping signature verification in emulator mode'
       );
+    } else {
+      this.verifyTypeformSignature(request.typeformSignature, request.rawBody);
     }
 
     // // First verify the typeform signature to ensure the request is legitimate
@@ -58,7 +58,10 @@ class TypeformController implements Controller {
 
     // validate data
     if (!typeformData.form_response?.form_id) {
-      throw new AppError('Invalid Typeform webhook data', ErrorCode.TYPEFORM_WEBHOOK_INVALID_DATA);
+      throw new AppError(
+        'Invalid Typeform webhook data',
+        ErrorCode.TYPEFORM_WEBHOOK_INVALID_DATA
+      );
     }
 
     // get the handler for the form
@@ -70,10 +73,13 @@ class TypeformController implements Controller {
 
     if (!formHandler) {
       // Log error internally but don't throw
-      logger.error('TypeformController.handleWebhook()- No handler found for form', {
-        formId,
-        eventId: typeformData.event_id,
-      });
+      logger.error(
+        'TypeformController.handleWebhook()- No handler found for form',
+        {
+          formId,
+          eventId: typeformData.event_id,
+        }
+      );
       // TODO add error to database
       return;
     }
@@ -90,16 +96,16 @@ class TypeformController implements Controller {
     next();
   };
 
-  private async handleTrialDayForm(
-    data: TypeformResponse
-  ): Promise<void> {
-    logger.info('TypeformController.handleTrialDayForm: handling trial day form', {
-      eventId: data.event_id,
-    });
+  private async handleTrialDayForm(data: TypeformResponse): Promise<void> {
+    logger.info(
+      'TypeformController.handleTrialDayForm: handling trial day form',
+      {eventId: data.event_id}
+    );
     // parse the form data
     const formData = parseTypeformResponse<TrialDayFormData>(
       data,
-      TYPEFORM_IDS.TRIAL_DAY);
+      TYPEFORM_IDS.TRIAL_DAY
+    );
 
     await this.params.trialdayService.handleTrialdayRequest(formData);
   }
@@ -109,10 +115,18 @@ class TypeformController implements Controller {
     payload: Buffer | undefined
   ): void {
     if (!receivedSignature) {
-      throw new AppError('No signature found in request', ErrorCode.TYPEFORM_WEBHOOK_INVALID_SIGNATURE, 401);
+      throw new AppError(
+        'No signature found in request',
+        ErrorCode.TYPEFORM_WEBHOOK_INVALID_SIGNATURE,
+        401
+      );
     }
     if (!payload) {
-      throw new AppError('No payload found in request, check the rawBodySaver middleware', ErrorCode.TYPEFORM_WEBHOOK_NO_RAW_BODY, 401);
+      throw new AppError(
+        'No payload found in request, check the rawBodySaver middleware',
+        ErrorCode.TYPEFORM_WEBHOOK_NO_RAW_BODY,
+        401
+      );
     }
     const secret = firebaseSecrets.typeformSecretKey.value();
     // Create HMAC and update with raw buffer
@@ -121,13 +135,18 @@ class TypeformController implements Controller {
     const hash = hmac.digest('base64');
     const expectedSignature = `sha256=${hash}`;
     if (receivedSignature !== expectedSignature) {
-      throw new AppError('invalid signature', ErrorCode.TYPEFORM_WEBHOOK_INVALID_SIGNATURE, 401, {
-        receivedSignature,
-        expectedSignature,
-        secretLength: secret.length,
-        hash,
-        payloadLength: payload.length,
-      });
+      throw new AppError(
+        'invalid signature',
+        ErrorCode.TYPEFORM_WEBHOOK_INVALID_SIGNATURE,
+        401,
+        {
+          receivedSignature,
+          expectedSignature,
+          secretLength: secret.length,
+          hash,
+          payloadLength: payload.length,
+        }
+      );
     }
     return;
   }

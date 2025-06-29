@@ -1,4 +1,4 @@
 export enum ReferrerType {
-    MEMBER = 'member',
-    BUSINESS = 'business',
+  MEMBER = 'member',
+  BUSINESS = 'business',
 }

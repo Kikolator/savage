@@ -1,7 +1,7 @@
-import { DocumentData } from 'firebase-admin/firestore';
+import {DocumentData} from 'firebase-admin/firestore';
 
 export interface UpdateDoc {
-    collection: string,
-    documentId: string,
-    data: DocumentData,
+  collection: string;
+  documentId: string;
+  data: DocumentData;
 }

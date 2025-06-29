@@ -1,7 +1,8 @@
-import express, { Express} from 'express';
-import { HttpServer } from './controllers';
-import { interceptors } from './middelwares';
-import { getControllersV1 } from './controllers/controllers-v1';
+import express, {Express} from 'express';
+
+import {HttpServer} from './controllers';
+import {interceptors} from './middelwares';
+import {getControllersV1} from './controllers/controllers-v1';
 
 // Initialize the express app
 const apiApp: Express = express();

@@ -1,5 +1,5 @@
-import { TYPEFORM_IDS } from '../../../core/config/typeform-ids';
-import { TrialDayFormData } from '../../../core/data/models';
+import {TYPEFORM_IDS} from '../../../core/config/typeform-ids';
+import {TrialDayFormData} from '../../../core/data/models';
 
 // Define a union type of all possible form types
 export type TypeformTypes = TrialDayFormData; // Add more form types here with union |
@@ -44,7 +44,7 @@ const typeformMappings: TypeformMapping<TypeformTypes>[] = [
 export function getTypeformMapping<T extends TypeformTypes>(
   formId: string
 ): TypeformMapping<T> | undefined {
-  return typeformMappings.find(
-    (mapping) => mapping.formId === formId
-  ) as TypeformMapping<T> | undefined;
+  return typeformMappings.find((mapping) => mapping.formId === formId) as
+    | TypeformMapping<T>
+    | undefined;
 }

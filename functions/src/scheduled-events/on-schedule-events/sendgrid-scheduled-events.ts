@@ -1,22 +1,22 @@
-import { onSchedule } from 'firebase-functions/v2/scheduler';
+import {onSchedule} from 'firebase-functions/v2/scheduler';
+import {logger} from 'firebase-functions';
+
 import {
   AddScheduledEvent,
   InitializeScheduledEvents,
   ScheduledV2Function,
 } from '../initialize-scheduled-events';
-import { logger } from 'firebase-functions';
-import { SendgridService } from '../../core/services/sendgrid-service';
-import { FirestoreService } from '../../core/services/firestore-service';
-import { firebaseSecrets } from '../../core/config/firebase-secrets';
-import { isDevelopment } from '../../core/utils/environment';
-import { mainConfig } from '../../core/config/main-config';
-import { SetDoc } from '../../core/data/models';
+import {SendgridService} from '../../core/services/sendgrid-service';
+import {FirestoreService} from '../../core/services/firestore-service';
+import {firebaseSecrets} from '../../core/config/firebase-secrets';
+import {isDevelopment} from '../../core/utils/environment';
+import {mainConfig} from '../../core/config/main-config';
+import {SetDoc} from '../../core/data/models';
 
 export class SendgridScheduledEvents implements InitializeScheduledEvents {
   initialize(add: AddScheduledEvent): void {
     add(this.updateSendgrid);
   }
-
 
   // Calls the Sendgrid API getting the latest custom fields,
   // and updates the Firestore collection
@@ -27,9 +27,12 @@ export class SendgridScheduledEvents implements InitializeScheduledEvents {
         region: mainConfig.cloudFunctionsLocation,
         secrets: [firebaseSecrets.sendgridApiKey],
         schedule: 'every 1 hours',
-      }, async () => {
+      },
+      async () => {
         try {
-          logger.info('SendgridScheduledEvents.updateSendgrid()- Updating custom fields');
+          logger.info(
+            'SendgridScheduledEvents.updateSendgrid()- Updating custom fields'
+          );
           // init new services
           const sendgridService = SendgridService.getInstance();
           const firestoreService = FirestoreService.getInstance();
@@ -52,17 +55,19 @@ export class SendgridScheduledEvents implements InitializeScheduledEvents {
               data: list,
               merge: true,
             }));
-            const data: Array<SetDoc> = [
-              ...fieldData,
-              ...listData,
-            ];
+            const data: Array<SetDoc> = [...fieldData, ...listData];
             await firestoreService.setDocuments(data);
           } else {
-            logger.debug('SendgridScheduledEvents.updateSendgrid()- In development mode, the custom fields and lists will not be updated in Firestore');
+            logger.debug(
+              'SendgridScheduledEvents.updateSendgrid()- In development mode, the custom fields and lists will not be updated in Firestore'
+            );
           }
           return;
         } catch (error) {
-          logger.error('SendgridScheduledEvents.updateSendgrid()- Error updating custom fields', error);
+          logger.error(
+            'SendgridScheduledEvents.updateSendgrid()- Error updating custom fields',
+            error
+          );
           // add error to firestore if not in debug mode
           if (!isDevelopment()) {
             if (error instanceof Error) {
@@ -78,9 +83,12 @@ export class SendgridScheduledEvents implements InitializeScheduledEvents {
               return;
             }
           } else {
-            logger.debug('SendgridScheduledEvents.updateSendgrid()- In development mode, the error will not be logged in Firestore');
+            logger.debug(
+              'SendgridScheduledEvents.updateSendgrid()- In development mode, the error will not be logged in Firestore'
+            );
           }
         }
-      }),
+      }
+    ),
   };
 }

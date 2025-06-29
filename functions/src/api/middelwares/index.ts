@@ -1,7 +1,8 @@
-import { Request, Response, NextFunction } from 'express';
+import {Request, Response, NextFunction} from 'express';
 import * as bodyParser from 'body-parser';
-import { setTypeformSignature } from './typeform/typeform-signature';
-import { logger } from 'firebase-functions';
+import {logger} from 'firebase-functions';
+
+import {setTypeformSignature} from './typeform/typeform-signature';
 
 // custom verifier function, only to requests from Typeform
 const rawBodySaver = (
@@ -24,13 +25,14 @@ const rawBodySaver = (
   }
 };
 
-const options = {
-  verify: rawBodySaver,
-};
+const options = {verify: rawBodySaver};
 
 // Middleware to check if request is from Typeform
 const isTypeformRequest = (req: Request, res: Response, next: NextFunction) => {
-  if (req.headers['user-agent'] === 'Typeform Webhooks' && req.headers['typeform-signature']) {
+  if (
+    req.headers['user-agent'] === 'Typeform Webhooks' &&
+    req.headers['typeform-signature']
+  ) {
     bodyParser.json(options)(req, res, next);
   } else {
     bodyParser.json()(req, res, next);

@@ -11,6 +11,7 @@ module.exports = {
     'plugin:import/typescript',
     'google',
     'plugin:@typescript-eslint/recommended',
+    'prettier',
   ],
   parser: '@typescript-eslint/parser',
   parserOptions: {
@@ -21,48 +22,38 @@ module.exports = {
     '/lib/**/*', // Ignore built files.
     '/generated/**/*', // Ignore generated files.
   ],
-  plugins: [
-    '@typescript-eslint',
-    'import',
-  ],
+  plugins: ['@typescript-eslint', 'import', 'prettier'],
   rules: {
-    'quotes': ['error', 'single'],
+    'prettier/prettier': 'error',
+    quotes: ['error', 'single'],
     'import/no-unresolved': 0,
-    'indent': ['error', 2, {
-      'SwitchCase': 1,
-      'FunctionDeclaration': {
-        'parameters': 'first',
-      },
-      'FunctionExpression': {
-        'parameters': 'first',
-      },
-      'CallExpression': {
-        'arguments': 'first',
-      },
-      'ArrayExpression': 1,
-      'ObjectExpression': 1,
-      'ImportDeclaration': 1,
-    }],
     'object-curly-spacing': 0,
     'require-jsdoc': 0,
     'valid-jsdoc': 0,
     'no-explicit-any': 0,
     'operator-linebreak': 0,
-    'space-before-function-paren': ['error', {
-      'anonymous': 'never',
-      'named': 'never',
-      'asyncArrow': 'always',
-    }],
-    'arrow-spacing': ['error', { 'before': true, 'after': true }],
-    'max-len': ['error', {
-      'code': 80,
-      'ignoreUrls': true,
-      'ignoreStrings': true,
-      'ignoreTemplateLiterals': true,
-      'ignoreRegExpLiterals': true,
-      'ignoreComments': true,
-      // 'ignoreImportStatements': true,
-    }],
-    // 'import/newline-after-import': ['error', 'always'],
+    'space-before-function-paren': 0,
+    'arrow-spacing': 0,
+    'max-len': 0,
+    'function-paren-newline': 0,
+    'array-element-newline': 0,
+    'object-property-newline': 0,
+    'object-curly-newline': 0,
+    'import/newline-after-import': 0,
+    'import/order': [
+      'error',
+      {
+        groups: [
+          'builtin',
+          'external',
+          'internal',
+          'parent',
+          'sibling',
+          'index',
+        ],
+        'newlines-between': 'always',
+      },
+    ],
+    'import/no-duplicates': 'error',
   },
 };
