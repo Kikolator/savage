@@ -15,6 +15,8 @@ import {
 } from '../data/models';
 import {AppError, ErrorCode} from '../errors/app-error';
 import {firebaseSecrets} from '../config/firebase-secrets';
+import {isDevelopment} from '../utils/environment';
+import {OfficeRndMemberStatus} from '../data/enums';
 
 import {FirestoreService} from './firestore-service';
 
@@ -164,6 +166,27 @@ export default class OfficeRndService {
 
   public async getMember(id: string): Promise<OfficeRndMember> {
     logger.info('OfficeRndService.getMember() - Getting member', {id: id});
+
+    // Skip API call in development mode
+    if (isDevelopment()) {
+      logger.info(
+        'OfficeRndService.getMember() - Skipping API call in development mode'
+      );
+      // Return mock data for testing
+      return {
+        _id: id,
+        name: 'Test User',
+        email: 'test@example.com',
+        location: 'mock-location-id',
+        company: 'mock-company-id',
+        status: OfficeRndMemberStatus.LEAD,
+        startDate: new Date(),
+        createdAt: new Date(),
+        modifiedAt: new Date(),
+        properties: {},
+      } as OfficeRndMember;
+    }
+
     // initilize token.
     await this.initializeToken();
     if (this.token == null) {
@@ -205,6 +228,29 @@ export default class OfficeRndService {
       'OfficeRndService.getMembersByEmail() - Getting members by email',
       {email: email}
     );
+
+    // Skip API call in development mode
+    if (isDevelopment()) {
+      logger.info(
+        'OfficeRndService.getMembersByEmail() - Skipping API call in development mode'
+      );
+      // Return mock data for testing
+      return [
+        {
+          _id: 'mock-member-id',
+          name: 'Test User',
+          email: email,
+          location: 'mock-location-id',
+          company: 'mock-company-id',
+          status: OfficeRndMemberStatus.LEAD,
+          startDate: new Date(),
+          createdAt: new Date(),
+          modifiedAt: new Date(),
+          properties: {},
+        } as OfficeRndMember,
+      ];
+    }
+
     // Initialize token.
     await this.initializeToken();
     if (this.token == null) {
@@ -246,6 +292,15 @@ export default class OfficeRndService {
       id: id,
       properties: properties,
     });
+
+    // Skip API call in development mode
+    if (isDevelopment()) {
+      logger.info(
+        'OfficeRndService.updateMember() - Skipping API call in development mode'
+      );
+      return;
+    }
+
     // initilize token.
     await this.initializeToken();
     if (this.token == null) {
@@ -282,6 +337,32 @@ export default class OfficeRndService {
   // Get all locations from OfficeRnd.
   public async getLocations(): Promise<Array<OfficeRndLocation>> {
     logger.info('OfficeRndService.getLocations() - Getting locations');
+
+    // Skip API call in development mode
+    if (isDevelopment()) {
+      logger.info(
+        'OfficeRndService.getLocations() - Skipping API call in development mode'
+      );
+      // Return mock data for testing
+      return [
+        {
+          _id: 'mock-location-id',
+          name: 'Mock Location',
+          address: {
+            country: 'Germany',
+            state: 'Berlin',
+            city: 'Berlin',
+            zip: '10115',
+            latitude: '52.5200',
+            longitude: '13.4050',
+          },
+          timezone: 'Europe/Berlin',
+          isOpen: true,
+          isPublic: true,
+        } as OfficeRndLocation,
+      ];
+    }
+
     // initilize token.
     await this.initializeToken();
     if (this.token == null) {
@@ -324,6 +405,26 @@ export default class OfficeRndService {
     logger.info('OfficeRndService.createMember() - Creating member', {
       member: member,
     });
+
+    // Skip API call in development mode
+    if (isDevelopment()) {
+      logger.info(
+        'OfficeRndService.createMember() - Skipping API call in development mode'
+      );
+      // Return mock data for testing
+      return {
+        _id: 'mock-created-member-id',
+        name: member.name,
+        email: member.email,
+        location: member.location,
+        company: 'mock-company-id',
+        status: OfficeRndMemberStatus.LEAD,
+        startDate: member.startDate,
+        createdAt: new Date(),
+        modifiedAt: new Date(),
+        properties: member.properties,
+      } as OfficeRndMember;
+    }
 
     // initilize token.
     await this.initializeToken();
@@ -368,6 +469,23 @@ export default class OfficeRndService {
     logger.info(
       'OfficeRndService.getOpportunityStatuses() - Getting opportunity statuses'
     );
+
+    // Skip API call in development mode
+    if (isDevelopment()) {
+      logger.info(
+        'OfficeRndService.getOpportunityStatuses() - Skipping API call in development mode'
+      );
+      // Return mock data for testing
+      return [
+        {
+          _id: '682200cd47119167b0c24e9a',
+          description: 'Mock Opportunity Status',
+          probability: 50,
+          isSystem: false,
+        } as OfficeRndOpportunityStatus,
+      ];
+    }
+
     // initilize token.
     await this.initializeToken();
     if (this.token == null) {
@@ -461,6 +579,34 @@ export default class OfficeRndService {
     modifiedAt?: string;
   }): Promise<Array<OfficeRndOpportunity>> {
     logger.info('OfficeRndService.getOpportunities() - Getting opportunities');
+
+    // Skip API call in development mode
+    if (isDevelopment()) {
+      logger.info(
+        'OfficeRndService.getOpportunities() - Skipping API call in development mode'
+      );
+      // Return mock data for testing
+      return [
+        {
+          _id: 'mock-opportunity-id',
+          name: 'Mock Opportunity',
+          company: 'mock-company-id',
+          member: params.member || 'mock-member-id',
+          status: 'mock-status',
+          probability: 50,
+          startDate: new Date(),
+          dealSize: 1000,
+          membersCount: 1,
+          resources: [],
+          requestedPlans: [],
+          createdAt: new Date().toISOString(),
+          createdBy: 'mock-user',
+          modifiedAt: new Date().toISOString(),
+          modifiedBy: 'mock-user',
+        } as OfficeRndOpportunity,
+      ];
+    }
+
     // initilize token.
     await this.initializeToken();
     if (this.token == null) {
@@ -524,6 +670,15 @@ export default class OfficeRndService {
       id: id,
       opportunity: opportunity,
     });
+
+    // Skip API call in development mode
+    if (isDevelopment()) {
+      logger.info(
+        'OfficeRndService.updateOpportunity() - Skipping API call in development mode'
+      );
+      return;
+    }
+
     // initilize token.
     await this.initializeToken();
     if (this.token == null) {
@@ -563,6 +718,15 @@ export default class OfficeRndService {
     logger.info('OfficeRndService.createOpportunity() - Creating opportunity', {
       opportunity: opportunity,
     });
+
+    // Skip API call in development mode
+    if (isDevelopment()) {
+      logger.info(
+        'OfficeRndService.createOpportunity() - Skipping API call in development mode'
+      );
+      return;
+    }
+
     // initilize token.
     await this.initializeToken();
     if (this.token == null) {
@@ -607,6 +771,15 @@ export default class OfficeRndService {
       paymentLines: params.paymentLines,
       issueDate: params.issueDate,
     });
+
+    // Skip API call in development mode
+    if (isDevelopment()) {
+      logger.info(
+        'OfficeRndService.addOverPayment() - Skipping API call in development mode'
+      );
+      return;
+    }
+
     // initilize token.
     await this.initializeToken();
     if (this.token == null) {
@@ -669,6 +842,16 @@ export default class OfficeRndService {
       memberId: params.memberId,
       companyId: params.companyId,
     });
+
+    // Skip API call in development mode
+    if (isDevelopment()) {
+      logger.info(
+        'OfficeRndService.addNewFee() - Skipping API call in development mode'
+      );
+      // Return mock fee ID for testing
+      return 'mock-fee-id';
+    }
+
     // initilize token.
     await this.initializeToken();
     if (this.token == null) {

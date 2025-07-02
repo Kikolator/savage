@@ -13,7 +13,6 @@ import {
 import {OfficeRndMemberStatus} from '../data/enums';
 import {AppError, ErrorCode} from '../errors/app-error';
 import {officeRndConfig} from '../config/office-rnd-config';
-import {isDevelopment} from '../utils/environment';
 
 import OfficeRndService from './office-rnd-service';
 import {SendgridService} from './sendgrid-service';
@@ -202,104 +201,113 @@ export class TrialdayService {
       //   },
       // });
 
-      // Don't call sendgrid if in development mode.
-      if (!isDevelopment()) {
-        // get custom fields from firestore (location, membership_status, trial_start_date, referrer_email, newsletter_opt_in, signup_source).
-        const customFieldsQuery =
-          await this.params.firestoreService.getCollection(
-            'sendgrid/metadata/customFields'
-          );
-        const customFields: {[key: string]: string} = {};
-        customFieldsQuery.map((item) => {
-          switch (item.name) {
-            case 'location':
-              customFields[item.id] = 'Estepona, Spain';
-              break;
-            case 'membership_status':
-              customFields[item.id] = 'lead';
-              break;
-            case 'trial_start_date':
-              customFields[item.id] = serverStartDate.toDateString();
-              break;
-            case 'referrer_code':
-              customFields[item.id] = formData.referralCode || '';
-              break;
-            case 'newsletter_opt_in':
-              customFields[item.id] = 'true';
-              break;
-            case 'signup_source':
-              customFields[item.id] = formData.utmSource || 'trialday-form';
-              break;
-            default:
-              break;
-          }
-        });
-        // Create new contact object.
-        const newContact: SendgridContactRequest = {
-          email: formData.email,
+      // get custom fields from firestore (location, membership_status, trial_start_date, referrer_email, newsletter_opt_in, signup_source).
+      const customFieldsQuery =
+        await this.params.firestoreService.getCollection(
+          'sendgrid/metadata/customFields'
+        );
+      const customFields: {[key: string]: string} = {};
+      customFieldsQuery.map((item) => {
+        switch (item.name) {
+          case 'location':
+            customFields[item.id] = 'Estepona, Spain';
+            break;
+          case 'membership_status':
+            customFields[item.id] = 'lead';
+            break;
+          case 'trial_start_date':
+            customFields[item.id] = serverStartDate.toDateString();
+            break;
+          case 'referrer_code':
+            customFields[item.id] = formData.referralCode || '';
+            break;
+          case 'newsletter_opt_in':
+            customFields[item.id] = 'true';
+            break;
+          case 'signup_source':
+            customFields[item.id] = formData.utmSource || 'trialday-form';
+            break;
+          default:
+            break;
+        }
+      });
+      // Create new contact object.
+      const newContact: SendgridContactRequest = {
+        email: formData.email,
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        phone_number_id: formData.phoneNumber,
+        custom_fields: customFields,
+      };
+      // query sendgrid metadata collection for lead list id.
+      const LeadListQuery = await this.params.firestoreService.queryCollection(
+        'sendgrid/metadata/lists',
+        [
+          {
+            field: 'name',
+            operator: '==',
+            value: 'leads',
+          },
+        ]
+      );
+      if (LeadListQuery.length === 0) {
+        throw new AppError(
+          'TrialdayService.handleTrialdayRequest()- Lead list not found.',
+          ErrorCode.SENDGRID_LIST_NOT_FOUND,
+          404,
+          {memberEmail: formData.email}
+        );
+      }
+      if (LeadListQuery.length > 1) {
+        throw new AppError(
+          'TrialdayService.handleTrialdayRequest()- Multiple lead lists found.',
+          ErrorCode.SENDGRID_MULTIPLE_LISTS_FOUND,
+          404,
+          {memberEmail: formData.email}
+        );
+      }
+      const leadList = LeadListQuery[0] as SendgridList;
+
+      // Add contact to Sendgrid.
+      await this.params.sendgridService.addContacts(
+        [leadList.id],
+        [newContact]
+      );
+
+      logger.debug('Test Date: ', serverStartDate);
+      logger.debug(
+        'Test Date formatted: ',
+        format(
+          toZonedTime(serverStartDate, 'Europe/Madrid'),
+          // eslint-disable-next-line quotes
+          "EEEE, 'the' dd 'of' MMMM yyyy"
+        )
+      );
+      // Build mail data.
+      const mailData: MailDataRequired = {
+        from: {
+          email: 'noreply@savage-coworking.com',
+          name: 'Savage Coworking',
+        },
+        replyTo: 'hub@savage-coworking.com',
+        to: formData.email,
+        templateId: 'd-25105204bd734ff49bcfb6dbd3ce4deb',
+        dynamicTemplateData: {
           first_name: formData.firstName,
           last_name: formData.lastName,
-          phone_number_id: formData.phoneNumber,
-          custom_fields: customFields,
-        };
-        // query sendgrid metadata collection for lead list id.
-        const LeadListQuery =
-          await this.params.firestoreService.queryCollection(
-            'sendgrid/metadata/lists',
-            [
-              {
-                field: 'name',
-                operator: '==',
-                value: 'leads',
-              },
-            ]
-          );
-        if (LeadListQuery.length === 0) {
-          throw new AppError(
-            'TrialdayService.handleTrialdayRequest()- Lead list not found.',
-            ErrorCode.SENDGRID_LIST_NOT_FOUND,
-            404,
-            {memberEmail: formData.email}
-          );
-        }
-        if (LeadListQuery.length > 1) {
-          throw new AppError(
-            'TrialdayService.handleTrialdayRequest()- Multiple lead lists found.',
-            ErrorCode.SENDGRID_MULTIPLE_LISTS_FOUND,
-            404,
-            {memberEmail: formData.email}
-          );
-        }
-        const leadList = LeadListQuery[0] as SendgridList;
-        // Add contact to Sendgrid.
-        await this.params.sendgridService.addContacts(
-          [leadList.id],
-          [newContact]
-        );
-        // Build mail data.
-        const mailData: MailDataRequired = {
-          from: {
-            email: 'hub@savage-coworking.com', // sending email
-            name: 'Savage Coworking', // company name
-          },
-          to: formData.email,
-          templateId: 'd-25105204bd734ff49bcfb6dbd3ce4deb',
-          dynamicTemplateData: {
-            first_name: formData.firstName,
-            last_name: formData.lastName,
-            trial_date: format(
-              toZonedTime(serverStartDate, 'Europe/Madrid'),
-              'EEEE, "the" do "of" MMMM yyyy'
-            ),
-            trial_start_time: format(
-              toZonedTime(serverStartDate, 'Europe/Madrid'),
-              'h:mm a'
-            ),
-          },
-        };
-        // Send confirmation email.
-        await this.params.sendgridService.mailSend(mailData);
-      }
+          trial_date: format(
+            toZonedTime(serverStartDate, 'Europe/Madrid'),
+            // eslint-disable-next-line quotes
+            "EEEE, 'the' dd 'of' MMMM yyyy"
+          ),
+          trial_start_time: format(
+            toZonedTime(serverStartDate, 'Europe/Madrid'),
+            'h:mm a'
+          ),
+        },
+      };
+      // Send confirmation email.
+      await this.params.sendgridService.mailSend(mailData);
 
       // update trial day request status to confirmation-email-sent.
       await this.params.firestoreService.updateDocument({
@@ -318,11 +326,19 @@ export class TrialdayService {
         });
       }
     } catch (error) {
+      let errorMessage;
+      if (error instanceof AppError) {
+        errorMessage = error.message;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      } else {
+        errorMessage = 'Unknown error';
+      }
       // update firestore status to error.
       await this.params.firestoreService.updateDocument({
         collection: this.trialDayRequestsCollection,
         documentId: formData.eventId,
-        data: {status: 'error'},
+        data: {error: errorMessage},
       });
       throw error;
     }

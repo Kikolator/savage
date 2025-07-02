@@ -42,26 +42,20 @@ export class SendgridScheduledEvents implements InitializeScheduledEvents {
           const lists = await sendgridService.getLists();
           // set the firestore sendgrid_data.meta document
           // with merge true, so only the provided fields will be updated
-          if (!isDevelopment()) {
-            const fieldData: Array<SetDoc> = customFields.map((field) => ({
-              collection: 'sendgrid',
-              documentId: `metadata/customFields/${field.id}`,
-              data: field,
-              merge: true,
-            }));
-            const listData: Array<SetDoc> = lists.map((list) => ({
-              collection: 'sendgrid',
-              documentId: `metadata/lists/${list.id}`,
-              data: list,
-              merge: true,
-            }));
-            const data: Array<SetDoc> = [...fieldData, ...listData];
-            await firestoreService.setDocuments(data);
-          } else {
-            logger.debug(
-              'SendgridScheduledEvents.updateSendgrid()- In development mode, the custom fields and lists will not be updated in Firestore'
-            );
-          }
+          const fieldData: Array<SetDoc> = customFields.map((field) => ({
+            collection: 'sendgrid',
+            documentId: `metadata/customFields/${field.id}`,
+            data: field,
+            merge: true,
+          }));
+          const listData: Array<SetDoc> = lists.map((list) => ({
+            collection: 'sendgrid',
+            documentId: `metadata/lists/${list.id}`,
+            data: list,
+            merge: true,
+          }));
+          const data: Array<SetDoc> = [...fieldData, ...listData];
+          await firestoreService.setDocuments(data);
           return;
         } catch (error) {
           logger.error(

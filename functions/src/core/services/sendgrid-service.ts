@@ -15,6 +15,7 @@ import {
 } from '../data/models';
 import {AppError, ErrorCode} from '../errors/app-error';
 import {firebaseSecrets} from '../config/firebase-secrets';
+import {isDevelopment} from '../utils/environment';
 
 export class SendgridService {
   private apiKey: string | null = null;
@@ -128,13 +129,20 @@ export class SendgridService {
         contacts: contacts,
       },
     };
-    const [response, body] = await this.client.request(request);
-    if (response.statusCode !== 202) {
-      throw new Error(
-        `Error adding Sendgrid contact: ${response.statusCode} ${response.body}`
+    if (isDevelopment()) {
+      logger.debug(
+        'SendgridService.addContact()- In development mode, the contact will not be added to Sendgrid'
       );
+      return 'fake-contact-id';
+    } else {
+      const [response, body] = await this.client.request(request);
+      if (response.statusCode !== 202) {
+        throw new Error(
+          `Error adding Sendgrid contact: ${response.statusCode} ${response.body}`
+        );
+      }
+      return body;
     }
-    return body;
   }
 
   // Sends an email to one or more recipients.
@@ -152,18 +160,25 @@ export class SendgridService {
         ErrorCode.UNKNOWN_ERROR
       );
     }
-    // Send the email(s)
-    const response: [ClientResponse, object] = await this.mail.send(
-      mailData,
-      isMultiple
-    );
-    // Check the response
-    if (response[0].statusCode !== 202) {
-      throw new AppError(
-        `Error sending Sendgrid mail: ${response[0].statusCode} ${response[0].body}`,
-        ErrorCode.SENDGRID_MAIL_SEND_FAILED
+    if (isDevelopment()) {
+      logger.debug(
+        'SendgridService.mailSend()- In development mode, the email will not be sent'
       );
+      return;
+    } else {
+      // Send the email(s)
+      const response: [ClientResponse, object] = await this.mail.send(
+        mailData,
+        isMultiple
+      );
+      // Check the response
+      if (response[0].statusCode !== 202) {
+        throw new AppError(
+          `Error sending Sendgrid mail: ${response[0].statusCode} ${response[0].body}`,
+          ErrorCode.SENDGRID_MAIL_SEND_FAILED
+        );
+      }
+      return;
     }
-    return;
   }
 }
