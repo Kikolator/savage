@@ -14,6 +14,7 @@ import {Trialday} from '../../core/data/models';
 import {TrialdayStatus} from '../../core/data/enums';
 import {ReferralService} from '../../core/services/referral-service';
 import OfficeRndService from '../../core/services/office-rnd-service';
+import {firebaseSecrets} from '../../core/config/firebase-secrets';
 
 export class TrialdayEvents implements InitializeEventTriggers {
   constructor(
@@ -31,6 +32,7 @@ export class TrialdayEvents implements InitializeEventTriggers {
       {
         document: `${TrialdayService.trialDaysCollection}/{trialdayId}`,
         region: mainConfig.cloudFunctionsLocation,
+        secrets: [firebaseSecrets.sendgridApiKey],
       },
       async (event) => {
         try {

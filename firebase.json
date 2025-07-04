@@ -8,6 +8,33 @@
         "**/.*",
         "**/node_modules/**"
       ],
+      "headers": [
+        {
+          "source": "/v1/confirm-email",
+          "headers": [
+            {
+              "key": "Access-Control-Allow-Origin",
+              "value": "https://savage-coworking.com"
+            },
+            {
+              "key": "Access-Control-Allow-Methods",
+              "value": "POST, OPTIONS"
+            },
+            {
+              "key": "Access-Control-Allow-Headers",
+              "value": "Content-Type, savage-secret, Authorization"
+            },
+            {
+              "key": "Access-Control-Allow-Credentials",
+              "value": "true"
+            },
+            {
+              "key": "Access-Control-Max-Age",
+              "value": "86400"
+            }
+          ]
+        }
+      ],
       "rewrites": [
         {
           "source": "**",

@@ -22,6 +22,8 @@ exports.api = onRequest(
       firebaseSecrets.typeformSecretKey,
       firebaseSecrets.officeRndSecretKey,
       firebaseSecrets.sendgridApiKey,
+      firebaseSecrets.officeRndWebhookSecret,
+      firebaseSecrets.savageSecret,
     ],
   },
   apiApp

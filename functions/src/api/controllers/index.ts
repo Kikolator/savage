@@ -30,6 +30,10 @@ export class HttpServer {
     this.router.delete(path, this._catchErrorHandler(requestHandler));
   }
 
+  options(path: string, requestHandler: RequestHandler): void {
+    this.router.options(path, requestHandler);
+  }
+
   //   createdVersionedRouter;
   // This allows us to create a new router for a specific version
   createdVersionedRouter(version: string): Router {

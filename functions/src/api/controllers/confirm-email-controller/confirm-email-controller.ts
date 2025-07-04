@@ -14,7 +14,32 @@ export class ConfirmEmailController implements Controller {
   ) {}
   initialize(httpServer: HttpServer): void {
     httpServer.post('/confirm-email', this.handleConfirmEmail);
+    httpServer.options('/confirm-email', this.handleOptions);
   }
+
+  private handleOptions: RequestHandler = (request, response) => {
+    // Set CORS headers for preflight request
+    response.set({
+      'Access-Control-Allow-Origin': 'https://savage-coworking.com',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers':
+        'Content-Type, savage-secret, Authorization',
+      'Access-Control-Max-Age': '86400', // 24 hours
+      'Access-Control-Allow-Credentials': 'true',
+    });
+
+    // Log the OPTIONS request for debugging
+    logger.info(
+      'ConfirmEmailController.handleOptions: handling preflight request',
+      {
+        origin: request.headers.origin,
+        method: request.method,
+        headers: request.headers,
+      }
+    );
+
+    response.status(200).send();
+  };
 
   private handleConfirmEmail: RequestHandler = async (
     request,
@@ -29,6 +54,14 @@ export class ConfirmEmailController implements Controller {
           headers: request.headers,
         }
       );
+      response.set({
+        'Access-Control-Allow-Origin': 'https://savage-coworking.com',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers':
+          'Content-Type, savage-secret, Authorization',
+        'Access-Control-Allow-Credentials': 'true',
+      });
+
       // TODO: Verify the secret key
       //   const { query, headers, rawBody } = request;
       //   const signature = headers['savage-signature'] as string;
