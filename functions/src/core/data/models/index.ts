@@ -26,8 +26,15 @@ export * from './office-rnd/office-rnd-opportunity-status';
 export * from './office-rnd/office-rnd-opportunity-properties';
 export * from './office-rnd/office-rnd-opportunity-update';
 export * from './office-rnd/office-rnd-payment-line';
+export * from './office-rnd/office-rnd-company';
 
 // Referral models
 export * from './referral/referral';
 export * from './referral-code/referral-code';
 export * from './reward/reward';
+
+// Email
+export * from './email/email';
+
+// Trialday
+export * from './trialday/trialday';

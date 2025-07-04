@@ -27,7 +27,11 @@ export class ReferralFunctions implements InitializeCallableFunctions {
       {
         region: mainConfig.cloudFunctionsLocation,
         // TODO update cors settings for production.
-        cors: ['http://localhost:*', 'https://localhost:*'],
+        cors: [
+          'http://localhost:*',
+          'https://localhost:*',
+          'https://*.savage-coworking.com*',
+        ],
       },
       async (request) => {
         try {

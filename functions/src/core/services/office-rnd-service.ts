@@ -2,6 +2,7 @@ import {logger} from 'firebase-functions';
 
 import {officeRndConfig} from '../config/office-rnd-config';
 import {
+  OfficeRndCompany,
   OfficeRndLocation,
   OfficeRndMember,
   OfficeRndMemberProperties,
@@ -22,15 +23,118 @@ import {FirestoreService} from './firestore-service';
 
 export default class OfficeRndService {
   private token: OfficeRndTokenResponse | null = null;
-  private readonly officeRndCollection = 'officeRnd';
-  private readonly tokenDocumentId = 'token';
-  private readonly metadataDocumentId = 'metadata';
-  private readonly opportunityStatusesCollection = 'opportunityStatuses';
+  public static readonly metadataCollection = 'officeRndMetadata';
+  public static readonly tokenDocumentId = 'token';
+  public static readonly opportunityStatusesCollection =
+    'officeRndOpportunityStatuses';
+  public static readonly opportunitiesCollection = 'officeRndOpportunities';
+  public static readonly membersCollection = 'officeRndMembers';
+  public static readonly companiesCollection = 'officeRndCompanies';
   constructor(
     private readonly params: {
       firestoreService: FirestoreService;
     }
   ) {}
+
+  /**
+   * Generic method to handle paginated API calls to Office Rnd
+   * @param endpoint - The API endpoint path (e.g., 'members', 'locations', 'opportunities')
+   * @param methodName - Name of the calling method for logging purposes
+   * @param additionalParams - Optional query parameters to append to the URL
+   * @returns Array of results from all pages
+   */
+  private async fetchAllPages<T>(
+    endpoint: string,
+    methodName: string,
+    additionalParams?: Record<string, string>
+  ): Promise<Array<T>> {
+    logger.info(`${methodName} - Starting paginated fetch for ${endpoint}`);
+
+    // Initialize token
+    await this.initializeToken();
+    if (this.token == null) {
+      throw new AppError(
+        `${methodName} - Office Rnd token is null`,
+        ErrorCode.UNKNOWN_ERROR,
+        500
+      );
+    }
+
+    const allResults: Array<T> = [];
+    let cursorNext: string | null = null;
+    let pageCount = 0;
+
+    do {
+      pageCount++;
+      logger.debug(`${methodName} - Fetching page ${pageCount}`);
+
+      // Build URL with endpoint and parameters
+      let url = `${officeRndConfig.apiV2url}/${officeRndConfig.orgSlug}/${endpoint}`;
+      const params = new URLSearchParams();
+
+      // Add additional parameters if provided
+      if (additionalParams) {
+        Object.entries(additionalParams).forEach(([key, value]) => {
+          params.append(key, value);
+        });
+      }
+
+      // Add cursor parameter if available
+      if (cursorNext) {
+        params.append('$cursorNext', cursorNext);
+      }
+
+      // Append parameters to URL if any exist
+      const queryString = params.toString();
+      if (queryString) {
+        url += `?${queryString}`;
+      }
+
+      const options = {
+        method: 'GET',
+        headers: {
+          accept: 'application/json',
+          authorization: `Bearer ${this.token.access_token}`,
+        },
+      };
+
+      const response = await fetch(url, options);
+      const body = await response.json();
+      logger.debug(`${methodName} - Response status`, {
+        status: response.status,
+      });
+
+      if (response.status !== 200) {
+        throw new AppError(
+          `${methodName} - Failed to fetch ${endpoint}`,
+          ErrorCode.UNKNOWN_ERROR,
+          500,
+          body
+        );
+      }
+
+      logger.debug(`${methodName} - Got page ${pageCount}`, {
+        rangeStart: body.rangeStart,
+        rangeEnd: body.rangeEnd,
+        cursorNext: body.cursorNext,
+        cursorPrev: body.cursorPrev,
+        total: body.results.length,
+      });
+
+      // Add results to the collection
+      allResults.push(...body.results);
+
+      // Update cursor for next iteration
+      cursorNext = body.cursorNext || null;
+    } while (cursorNext);
+
+    logger.info(`${methodName} - Completed fetching all ${endpoint}`, {
+      totalPages: pageCount,
+      totalResults: allResults.length,
+    });
+
+    return allResults;
+  }
 
   private async initializeToken(): Promise<void> {
     try {
@@ -39,8 +143,8 @@ export default class OfficeRndService {
       // If token is null, get it from firestore
       if (this.token == null) {
         const response = (await this.params.firestoreService.getDocument(
-          this.officeRndCollection,
-          this.tokenDocumentId
+          OfficeRndService.metadataCollection,
+          OfficeRndService.tokenDocumentId
         )) as OfficeRndTokenResponse;
         this.token = response;
       }
@@ -78,8 +182,8 @@ export default class OfficeRndService {
 
         // Get the new token from firestore
         this.token = (await this.params.firestoreService.getDocument(
-          this.officeRndCollection,
-          this.tokenDocumentId
+          OfficeRndService.metadataCollection,
+          OfficeRndService.tokenDocumentId
         )) as OfficeRndTokenResponse;
       }
     } catch (error) {
@@ -155,8 +259,8 @@ export default class OfficeRndService {
     // Save token to firestore.
     const tokenResponse: OfficeRndTokenResponse = body;
     const doc: SetDoc = {
-      collection: this.officeRndCollection,
-      documentId: this.tokenDocumentId,
+      collection: OfficeRndService.metadataCollection,
+      documentId: OfficeRndService.tokenDocumentId,
       merge: true,
       data: tokenResponse,
     };
@@ -166,26 +270,6 @@ export default class OfficeRndService {
 
   public async getMember(id: string): Promise<OfficeRndMember> {
     logger.info('OfficeRndService.getMember() - Getting member', {id: id});
-
-    // Skip API call in development mode
-    if (isDevelopment()) {
-      logger.info(
-        'OfficeRndService.getMember() - Skipping API call in development mode'
-      );
-      // Return mock data for testing
-      return {
-        _id: id,
-        name: 'Test User',
-        email: 'test@example.com',
-        location: 'mock-location-id',
-        company: 'mock-company-id',
-        status: OfficeRndMemberStatus.LEAD,
-        startDate: new Date(),
-        createdAt: new Date(),
-        modifiedAt: new Date(),
-        properties: {},
-      } as OfficeRndMember;
-    }
 
     // initilize token.
     await this.initializeToken();
@@ -219,6 +303,102 @@ export default class OfficeRndService {
     return member;
   }
 
+  // Get all members from Firestore (source of truth)
+  public async getAllMembers(): Promise<Array<OfficeRndMember>> {
+    logger.info(
+      'OfficeRndService.getAllMembers() - Getting all members from Firestore'
+    );
+
+    try {
+      const query = await this.params.firestoreService.getCollection(
+        OfficeRndService.membersCollection
+      );
+      const membersResult: Array<OfficeRndMember> = [];
+      query.forEach((documentData) => {
+        membersResult.push(documentData as OfficeRndMember);
+      });
+
+      if (membersResult.length === 0) {
+        logger.warn(
+          'OfficeRndService.getAllMembers() - No members found in Firestore. Webhook sync may not be working.'
+        );
+      }
+
+      return membersResult;
+    } catch (error) {
+      if (
+        error instanceof AppError &&
+        error.code === ErrorCode.COLLECTION_EMPTY
+      ) {
+        logger.warn(
+          'OfficeRndService.getAllMembers() - Members collection is empty. Webhook sync may not be working.'
+        );
+        return [];
+      }
+      throw error;
+    }
+  }
+
+  // Get all members from OfficeRnd API (for migration, recovery, validation)
+  public async getAllMembersFromAPI(): Promise<Array<OfficeRndMember>> {
+    logger.info(
+      'OfficeRndService.getAllMembersFromAPI() - Getting all members from OfficeRnd API'
+    );
+
+    return this.fetchAllPages<OfficeRndMember>(
+      'members',
+      'OfficeRndService.getAllMembersFromAPI()'
+    );
+  }
+
+  // Get all companies from OfficeRnd API (for migration, recovery, validation)
+  public async getAllCompaniesFromAPI(): Promise<Array<OfficeRndCompany>> {
+    logger.info(
+      'OfficeRndService.getAllCompaniesFromAPI() - Getting all companies from OfficeRnd API'
+    );
+
+    return this.fetchAllPages<OfficeRndCompany>(
+      'companies',
+      'OfficeRndService.getAllCompaniesFromAPI()'
+    );
+  }
+
+  // Get all companies from Firestore (source of truth)
+  public async getAllCompanies(): Promise<Array<OfficeRndCompany>> {
+    logger.info(
+      'OfficeRndService.getAllCompanies() - Getting all companies from Firestore'
+    );
+
+    try {
+      const query = await this.params.firestoreService.getCollection(
+        OfficeRndService.companiesCollection
+      );
+      const companiesResult: Array<OfficeRndCompany> = [];
+      query.forEach((documentData) => {
+        companiesResult.push(documentData as OfficeRndCompany);
+      });
+
+      if (companiesResult.length === 0) {
+        logger.warn(
+          'OfficeRndService.getAllCompanies() - No companies found in Firestore. Webhook sync may not be working.'
+        );
+      }
+
+      return companiesResult;
+    } catch (error) {
+      if (
+        error instanceof AppError &&
+        error.code === ErrorCode.COLLECTION_EMPTY
+      ) {
+        logger.warn(
+          'OfficeRndService.getAllCompanies() - Companies collection is empty. Webhook sync may not be working.'
+        );
+        return [];
+      }
+      throw error;
+    }
+  }
+
   // Gets members by email from Office Rnd.
   // Returns an array of OfficeRndMember objects.
   public async getMembersByEmail(
@@ -229,61 +409,11 @@ export default class OfficeRndService {
       {email: email}
     );
 
-    // Skip API call in development mode
-    if (isDevelopment()) {
-      logger.info(
-        'OfficeRndService.getMembersByEmail() - Skipping API call in development mode'
-      );
-      // Return mock data for testing
-      return [
-        {
-          _id: 'mock-member-id',
-          name: 'Test User',
-          email: email,
-          location: 'mock-location-id',
-          company: 'mock-company-id',
-          status: OfficeRndMemberStatus.LEAD,
-          startDate: new Date(),
-          createdAt: new Date(),
-          modifiedAt: new Date(),
-          properties: {},
-        } as OfficeRndMember,
-      ];
-    }
-
-    // Initialize token.
-    await this.initializeToken();
-    if (this.token == null) {
-      throw new AppError(
-        'OfficeRndService.getMembersByEmail()- Office Rnd token is null',
-        ErrorCode.UNKNOWN_ERROR,
-        500
-      );
-    }
-    logger.debug('token initiliazation complete', {token: this.token});
-
-    // get member by email.
-    const url = `${officeRndConfig.apiV2url}/${officeRndConfig.orgSlug}/members?email=${email}`;
-    const options = {
-      method: 'GET',
-      headers: {
-        accept: 'application/json',
-        Authorization: `Bearer ${this.token.access_token}`,
-      },
-    };
-
-    const response = await fetch(url, options);
-    const body = await response.json();
-    if (response.status !== 200) {
-      throw new AppError(
-        'OfficeRndService.getMembersByEmail()- Failed to get Office Rnd members by email',
-        ErrorCode.UNKNOWN_ERROR,
-        500,
-        body
-      );
-    }
-    const members: Array<OfficeRndMember> = body.results;
-    return members;
+    return this.fetchAllPages<OfficeRndMember>(
+      'members',
+      'OfficeRndService.getMembersByEmail()',
+      {email: email}
+    );
   }
 
   // Updates a member in Office Rnd.
@@ -338,63 +468,14 @@ export default class OfficeRndService {
   public async getLocations(): Promise<Array<OfficeRndLocation>> {
     logger.info('OfficeRndService.getLocations() - Getting locations');
 
-    // Skip API call in development mode
-    if (isDevelopment()) {
-      logger.info(
-        'OfficeRndService.getLocations() - Skipping API call in development mode'
-      );
-      // Return mock data for testing
-      return [
-        {
-          _id: 'mock-location-id',
-          name: 'Mock Location',
-          address: {
-            country: 'Germany',
-            state: 'Berlin',
-            city: 'Berlin',
-            zip: '10115',
-            latitude: '52.5200',
-            longitude: '13.4050',
-          },
-          timezone: 'Europe/Berlin',
-          isOpen: true,
-          isPublic: true,
-        } as OfficeRndLocation,
-      ];
-    }
-
-    // initilize token.
-    await this.initializeToken();
-    if (this.token == null) {
-      throw new AppError(
-        'OfficeRndService.getLocations()- Office Rnd token is null',
-        ErrorCode.UNKNOWN_ERROR,
-        500
-      );
-    }
     // TODO Get locations from firestore.
     // If empty, get from Office Rnd.
-    const url = `${officeRndConfig.apiV2url}/${officeRndConfig.orgSlug}/locations`;
-    const options = {
-      method: 'GET',
-      headers: {
-        accept: 'application/json',
-        authorization: `Bearer ${this.token.access_token}`,
-      },
-    };
-    const response = await fetch(url, options);
-    const body = await response.json();
-    if (response.status !== 200) {
-      throw new AppError(
-        'OfficeRndService.getLocations()- Failed to get Office Rnd locations',
-        ErrorCode.UNKNOWN_ERROR,
-        500,
-        body
-      );
-    }
-    const locations: Array<OfficeRndLocation> = body.results;
+    const locations = await this.fetchAllPages<OfficeRndLocation>(
+      'locations',
+      'OfficeRndService.getLocations()'
+    );
+
     // TODO Save to firestore.
-    // Return locations.
     return locations;
   }
 
@@ -462,64 +543,62 @@ export default class OfficeRndService {
     return createdMember;
   }
 
-  // Get all oportunity statuses from Office Rnd.
+  // Get all opportunity statuses from Firestore (source of truth)
   public async getOpportunityStatuses(): Promise<
     Array<OfficeRndOpportunityStatus>
   > {
     logger.info(
-      'OfficeRndService.getOpportunityStatuses() - Getting opportunity statuses'
+      'OfficeRndService.getOpportunityStatuses() - Getting opportunity statuses from Firestore'
     );
 
-    // Skip API call in development mode
-    if (isDevelopment()) {
-      logger.info(
-        'OfficeRndService.getOpportunityStatuses() - Skipping API call in development mode'
-      );
-      // Return mock data for testing
-      return [
-        {
-          _id: '682200cd47119167b0c24e9a',
-          description: 'Mock Opportunity Status',
-          probability: 50,
-          isSystem: false,
-        } as OfficeRndOpportunityStatus,
-      ];
-    }
-
-    // initilize token.
-    await this.initializeToken();
-    if (this.token == null) {
-      throw new AppError(
-        'OfficeRndService.getOpportunityStatuses()- Office Rnd token is null',
-        ErrorCode.UNKNOWN_ERROR,
-        500
-      );
-    }
-
-    // Try to get from Firestore first
     try {
       const query = await this.params.firestoreService.getCollection(
-        this.officeRndCollection,
-        true,
-        this.metadataDocumentId,
-        this.opportunityStatusesCollection
+        OfficeRndService.opportunityStatusesCollection
       );
       const statusesResult: Array<OfficeRndOpportunityStatus> = [];
       query.forEach((documentData) => {
         statusesResult.push(documentData as OfficeRndOpportunityStatus);
       });
+
+      if (statusesResult.length === 0) {
+        logger.warn(
+          'OfficeRndService.getOpportunityStatuses() - No opportunity statuses found in Firestore. Webhook sync may not be working.'
+        );
+      }
+
       return statusesResult;
     } catch (error) {
-      // Only proceed to OfficeRnd if Firestore collection is empty
       if (
-        !(error instanceof AppError) ||
-        error.code !== ErrorCode.COLLECTION_EMPTY
+        error instanceof AppError &&
+        error.code === ErrorCode.COLLECTION_EMPTY
       ) {
-        throw error;
+        logger.warn(
+          'OfficeRndService.getOpportunityStatuses() - Opportunity statuses collection is empty. Webhook sync may not be working.'
+        );
+        return [];
       }
+      throw error;
+    }
+  }
+
+  // Get opportunity statuses from OfficeRnd API (for migration, recovery, validation)
+  public async getOpportunityStatusesFromAPI(): Promise<
+    Array<OfficeRndOpportunityStatus>
+  > {
+    logger.info(
+      'OfficeRndService.getOpportunityStatusesFromAPI() - Getting opportunity statuses from OfficeRnd API'
+    );
+
+    // Initialize token
+    await this.initializeToken();
+    if (this.token == null) {
+      throw new AppError(
+        'OfficeRndService.getOpportunityStatusesFromAPI()- Office Rnd token is null',
+        ErrorCode.UNKNOWN_ERROR,
+        500
+      );
     }
 
-    // Get from OfficeRnd API
     const url = `${officeRndConfig.apiV2url}/${officeRndConfig.orgSlug}/opportunity-statuses`;
     const options = {
       method: 'GET',
@@ -529,48 +608,22 @@ export default class OfficeRndService {
       },
     };
 
-    try {
-      const response = await fetch(url, options);
-      const body = await response.json();
+    const response = await fetch(url, options);
+    const body = await response.json();
 
-      if (response.status !== 200) {
-        throw new AppError(
-          'OfficeRndService.getOpportunityStatuses()- Failed to get Office Rnd opportunity statuses',
-          ErrorCode.UNKNOWN_ERROR,
-          response.status,
-          body
-        );
-      }
-
-      const opportunityStatuses: Array<OfficeRndOpportunityStatus> =
-        body.results;
-
-      // Save to Firestore
-      await this.params.firestoreService.setDocuments(
-        opportunityStatuses.map((status) => ({
-          collection: this.officeRndCollection,
-          documentId: `${this.metadataDocumentId}/${this.opportunityStatusesCollection}/${status._id}`,
-          data: status,
-          merge: true,
-        }))
-      );
-
-      return opportunityStatuses;
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
+    if (response.status !== 200) {
       throw new AppError(
-        'OfficeRndService.getOpportunityStatuses()- Failed to fetch opportunity statuses',
+        'OfficeRndService.getOpportunityStatusesFromAPI()- Failed to get Office Rnd opportunity statuses',
         ErrorCode.UNKNOWN_ERROR,
-        500,
-        error
+        response.status,
+        body
       );
     }
+
+    return body.results;
   }
 
-  // Get opportunities from office rnd
-  // TODO add firestore cache.
+  // Get opportunities from Firestore (source of truth)
   public async getOpportunities(params: {
     id?: string;
     member?: string;
@@ -578,87 +631,88 @@ export default class OfficeRndService {
     createdAt?: string;
     modifiedAt?: string;
   }): Promise<Array<OfficeRndOpportunity>> {
-    logger.info('OfficeRndService.getOpportunities() - Getting opportunities');
+    logger.info(
+      'OfficeRndService.getOpportunities() - Getting opportunities from Firestore'
+    );
 
-    // Skip API call in development mode
-    if (isDevelopment()) {
-      logger.info(
-        'OfficeRndService.getOpportunities() - Skipping API call in development mode'
+    try {
+      const query = await this.params.firestoreService.getCollection(
+        OfficeRndService.opportunitiesCollection
       );
-      // Return mock data for testing
-      return [
-        {
-          _id: 'mock-opportunity-id',
-          name: 'Mock Opportunity',
-          company: 'mock-company-id',
-          member: params.member || 'mock-member-id',
-          status: 'mock-status',
-          probability: 50,
-          startDate: new Date(),
-          dealSize: 1000,
-          membersCount: 1,
-          resources: [],
-          requestedPlans: [],
-          createdAt: new Date().toISOString(),
-          createdBy: 'mock-user',
-          modifiedAt: new Date().toISOString(),
-          modifiedBy: 'mock-user',
-        } as OfficeRndOpportunity,
-      ];
-    }
+      const opportunitiesResult: Array<OfficeRndOpportunity> = [];
 
-    // initilize token.
-    await this.initializeToken();
-    if (this.token == null) {
-      throw new AppError(
-        'OfficeRndService.getOpportunities()- Office Rnd token is null',
-        ErrorCode.UNKNOWN_ERROR,
-        500
-      );
+      query.forEach((documentData) => {
+        const opportunity = documentData as OfficeRndOpportunity;
+
+        // Apply filters if provided
+        if (params.id && opportunity._id !== params.id) {
+          return;
+        }
+        if (params.member && opportunity.member !== params.member) {
+          return;
+        }
+        if (params.company && opportunity.company !== params.company) {
+          return;
+        }
+        if (params.createdAt && opportunity.createdAt !== params.createdAt) {
+          return;
+        }
+        if (params.modifiedAt && opportunity.modifiedAt !== params.modifiedAt) {
+          return;
+        }
+
+        opportunitiesResult.push(opportunity);
+      });
+
+      if (
+        opportunitiesResult.length === 0 &&
+        Object.keys(params).length === 0
+      ) {
+        logger.warn(
+          'OfficeRndService.getOpportunities() - No opportunities found in Firestore. Webhook sync may not be working.'
+        );
+      }
+
+      return opportunitiesResult;
+    } catch (error) {
+      if (
+        error instanceof AppError &&
+        error.code === ErrorCode.COLLECTION_EMPTY
+      ) {
+        logger.warn(
+          'OfficeRndService.getOpportunities() - Opportunities collection is empty. Webhook sync may not be working.'
+        );
+        return [];
+      }
+      throw error;
     }
-    let url = `${officeRndConfig.apiV2url}/${officeRndConfig.orgSlug}/opportunities`;
-    const options = {
-      method: 'GET',
-      headers: {
-        accept: 'application/json',
-        authorization: `Bearer ${this.token.access_token}`,
-      },
-    };
-    if (
-      params.id ||
-      params.member ||
-      params.company ||
-      params.createdAt ||
-      params.modifiedAt
-    ) {
-      url += '?';
-      if (params.id) {
-        url += `_id=${params.id}`;
-      }
-      if (params.member) {
-        url += `member=${params.member}`;
-      }
-      if (params.company) {
-        url += `company=${params.company}`;
-      }
-      if (params.createdAt) {
-        url += `createdAt=${params.createdAt}`;
-      }
-      if (params.modifiedAt) {
-        url += `modifiedAt=${params.modifiedAt}`;
-      }
-    }
-    const response = await fetch(url, options);
-    const body = await response.json();
-    if (response.status !== 200) {
-      throw new AppError(
-        'OfficeRndService.getOpportunities()- Failed to get Office Rnd opportunities',
-        ErrorCode.UNKNOWN_ERROR,
-        500,
-        body
-      );
-    }
-    return body.results as Array<OfficeRndOpportunity>;
+  }
+
+  // Get opportunities from OfficeRnd API (for migration, recovery, validation)
+  public async getOpportunitiesFromAPI(params: {
+    id?: string;
+    member?: string;
+    company?: string;
+    createdAt?: string;
+    modifiedAt?: string;
+  }): Promise<Array<OfficeRndOpportunity>> {
+    logger.info(
+      'OfficeRndService.getOpportunitiesFromAPI() - Getting opportunities from OfficeRnd API'
+    );
+
+    // Build additional parameters object
+    const additionalParams: Record<string, string> = {};
+    if (params.id) additionalParams._id = params.id;
+    if (params.member) additionalParams.member = params.member;
+    if (params.company) additionalParams.company = params.company;
+    if (params.createdAt) additionalParams.createdAt = params.createdAt;
+    if (params.modifiedAt) additionalParams.modifiedAt = params.modifiedAt;
+
+    return this.fetchAllPages<OfficeRndOpportunity>(
+      'opportunities',
+      'OfficeRndService.getOpportunitiesFromAPI()',
+      Object.keys(additionalParams).length > 0 ? additionalParams : undefined
+    );
   }
 
   // Updates an exisitng opportunity in Office Rnd.
@@ -714,7 +768,7 @@ export default class OfficeRndService {
   // Creates a new opportunity in Office Rnd.
   public async createOpportunity(
     opportunity: OfficeRndOpportunity
-  ): Promise<void> {
+  ): Promise<OfficeRndOpportunity> {
     logger.info('OfficeRndService.createOpportunity() - Creating opportunity', {
       opportunity: opportunity,
     });
@@ -724,7 +778,13 @@ export default class OfficeRndService {
       logger.info(
         'OfficeRndService.createOpportunity() - Skipping API call in development mode'
       );
-      return;
+      return {
+        _id: 'mock-created-opportunity-id',
+        name: opportunity.name,
+        member: opportunity.member,
+        company: opportunity.company,
+        status: opportunity.status,
+      } as OfficeRndOpportunity;
     }
 
     // initilize token.
@@ -756,7 +816,7 @@ export default class OfficeRndService {
         body
       );
     }
-    return;
+    return body as OfficeRndOpportunity;
   }
 
   public async addOverPayment(params: {

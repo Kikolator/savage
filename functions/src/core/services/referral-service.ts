@@ -139,6 +139,8 @@ export class ReferralService {
     referrerCompanyId: string | null;
     isTrialday: boolean;
     trialdayStartDate?: Date;
+    trialDayId?: string;
+    opportunityId?: string;
     membershipStartDate?: Date;
     subscriptionValue?: number;
     referralValue?: number;
@@ -151,6 +153,8 @@ export class ReferralService {
     const referredUserId = params.referredUserId;
     const isTrialday = params.isTrialday;
     const trialdayStartDate = params.trialdayStartDate;
+    const trialDayId = params.trialDayId;
+    const opportunityId = params.opportunityId;
     const membershipStartDate = params.membershipStartDate;
     const subscriptionValue = params.subscriptionValue;
     const referralValue = params.referralValue;
@@ -163,13 +167,26 @@ export class ReferralService {
       },
     ]);
 
-    // If trial day, trial start date cannot be undefined.
-    // If not trial day, trialdayStartDate must be undefined, and
-    // membershipStartDate, subscriptionValue, and referralValue must be defined.
+    // If trial day, trial start date, trial day id, and opportunity id are required.
+    // If not trial day, membership start date, subscription value, and referral value are required.
     if (isTrialday) {
       if (!trialdayStartDate) {
         throw new AppError(
           'Trial day start date is required when creating a trial day referral',
+          ErrorCode.INVALID_ARGUMENT,
+          400
+        );
+      }
+      if (!trialDayId) {
+        throw new AppError(
+          'Trial day id is required when creating a trial day referral',
+          ErrorCode.INVALID_ARGUMENT,
+          400
+        );
+      }
+      if (!opportunityId) {
+        throw new AppError(
+          'Opportunity id is required when creating a trial day referral',
           ErrorCode.INVALID_ARGUMENT,
           400
         );
@@ -199,6 +216,20 @@ export class ReferralService {
       if (trialdayStartDate) {
         throw new AppError(
           'Trial day start date must be undefined when creating a membership referral',
+          ErrorCode.INVALID_ARGUMENT,
+          400
+        );
+      }
+      if (trialDayId) {
+        throw new AppError(
+          'Trial day id must be undefined when creating a membership referral',
+          ErrorCode.INVALID_ARGUMENT,
+          400
+        );
+      }
+      if (opportunityId) {
+        throw new AppError(
+          'Opportunity id must be undefined when creating a membership referral',
           ErrorCode.INVALID_ARGUMENT,
           400
         );
@@ -309,6 +340,8 @@ export class ReferralService {
           referredUserId: referredUserId,
           referralCode: referralCode,
           trialStartDate: trialdayStartDate || null,
+          trialDayId: trialDayId || null,
+          opportunityId: opportunityId || null,
           membershipStartDate: membershipStartDate || null,
           subscriptionValue: subscriptionValue || null,
           referralValue: referralValue || null,

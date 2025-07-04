@@ -141,13 +141,13 @@
     },
     "singleProjectMode": true,
     "firestore": {
-      "port": 8081
+      "port": 8085
     },
     "hosting": {
       "port": 5050
     },
     "pubsub": {
-      "port": 8086
+      "port": 8090
     }
   }
 }

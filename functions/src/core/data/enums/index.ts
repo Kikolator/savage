@@ -3,6 +3,7 @@ export * from './office-rnd/office-rnd-member-status';
 
 // App Enums
 export * from './app/signup-source';
+export * from './app/trialday-status';
 
 // Referral Enums
 export * from './referral/referrer-type';

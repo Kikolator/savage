@@ -21,6 +21,36 @@ To check out v1 endpoint refer to the [API documentation](./API_V1.md).
 Sendgrid Functions:
 - **updateSendgerid**: Gets the latest custom field and list ids from sendgrid and stores them in firestore.
 
+## Event Triggers
+
+To keep app services clean and lean we use firestore event triggers to run document specific logic,
+for example on a status change, email confirmation, etc... We use a simple API to update the document, 
+and then the event trigger will handle all necesarry logic from there.
+
+Event triggers:
+- TrialdayEvents
+
+## OfficeRnd Integration
+
+### Webhook Handler
+- **OfficeRnd Webhook**: Handles real-time updates from OfficeRnd
+  - Verifies webhook signatures
+  - Updates Firestore collections
+  - Triggers downstream integrations
+
+### Scheduled Functions
+- **OfficeRnd Sync Validation**: Daily validation of data consistency
+  - Compares Firestore vs OfficeRnd data
+  - Rebuilds missing data if needed
+  - Alerts on inconsistencies
+
+### Data Access Patterns
+- **Read Operations**: Always from Firestore (fast, consistent)
+- **Write Operations**: Always to OfficeRnd API (triggers webhooks)
+- **Migration/Recovery**: Direct API access when needed
+
+For detailed implementation, see [Office RnD Documentation](./OFFICE_RND.md).
+
 ## Core
 
 Core functionalities of our functions package.

@@ -5,7 +5,8 @@ import {scheduledEvents} from './scheduled-events';
 import {mainConfig} from './core/config/main-config';
 import apiApp from './api';
 import {firebaseSecrets} from './core/config/firebase-secrets';
-import {callableFunctions} from './app-functions';
+import {callableFunctions, trialdayMigrationFunctions} from './app-functions';
+import {eventTriggers} from './event-triggers';
 
 // Set timezone to UTC
 process.env.TZ = 'UTC';
@@ -31,3 +32,9 @@ Object.assign(exports, scheduledEvents());
 
 // App Functions
 Object.assign(exports, callableFunctions());
+
+// Migration Functions
+Object.assign(exports, trialdayMigrationFunctions);
+
+// Event Triggers
+Object.assign(exports, eventTriggers());

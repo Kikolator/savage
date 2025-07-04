@@ -15,6 +15,10 @@ export class Referral {
   referralCode: string;
   // The start date of the trial day.
   trialStartDate: Date | null | undefined;
+  // The id of the trial day.
+  trialDayId: string | null | undefined;
+  // The id of the opportunity.
+  opportunityId: string | null | undefined;
   // The start date of the membership.
   membershipStartDate: Date | null | undefined;
   // The subscription value of the referred user.
@@ -33,6 +37,8 @@ export class Referral {
     referrerType: ReferrerType;
     referredUserId: string;
     referralCode: string;
+    trialDayId: string | null | undefined;
+    opportunityId: string | null | undefined;
     trialStartDate: Date | null | undefined;
     membershipStartDate: Date | null | undefined;
     subscriptionValue: number | null | undefined;
@@ -47,6 +53,8 @@ export class Referral {
     this.referredUserId = params.referredUserId;
     this.referralCode = params.referralCode;
     this.trialStartDate = params.trialStartDate;
+    this.trialDayId = params.trialDayId;
+    this.opportunityId = params.opportunityId;
     this.membershipStartDate = params.membershipStartDate;
     this.subscriptionValue = params.subscriptionValue;
     this.referralValue = params.referralValue;
@@ -63,6 +71,8 @@ export class Referral {
       referredUserId: data.referredUserId as string,
       referralCode: data.referralCode as string,
       trialStartDate: data.trialStartDate as Date | undefined,
+      trialDayId: data.trialDayId as string | undefined,
+      opportunityId: data.opportunityId as string | undefined,
       membershipStartDate: data.membershipStartDate as Date | undefined,
       subscriptionValue: data.subscriptionValue as number | undefined,
       referralValue: data.referralValue as number | undefined,
@@ -80,6 +90,8 @@ export class Referral {
       referredUserId: this.referredUserId,
       referralCode: this.referralCode,
       trialStartDate: this.trialStartDate,
+      trialDayId: this.trialDayId,
+      opportunityId: this.opportunityId,
       membershipStartDate: this.membershipStartDate,
       subscriptionValue: this.subscriptionValue,
       referralValue: this.referralValue,

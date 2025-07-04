@@ -36,10 +36,10 @@ export class SendgridScheduledEvents implements InitializeScheduledEvents {
           // init new services
           const sendgridService = SendgridService.getInstance();
           const firestoreService = FirestoreService.getInstance();
-          // get the latest custom fields
-          const customFields = await sendgridService.getCustomFields();
-          // get the latest lists
-          const lists = await sendgridService.getLists();
+          // get the latest custom fields from SendGrid API
+          const customFields = await sendgridService.getCustomFieldsFromAPI();
+          // get the latest lists from SendGrid API
+          const lists = await sendgridService.getListsFromAPI();
           // set the firestore sendgrid_data.meta document
           // with merge true, so only the provided fields will be updated
           const fieldData: Array<SetDoc> = customFields.map((field) => ({
