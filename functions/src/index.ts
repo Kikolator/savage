@@ -7,12 +7,16 @@ import apiApp from './api';
 import {firebaseSecrets} from './core/config/firebase-secrets';
 import {callableFunctions, trialdayMigrationFunctions} from './app-functions';
 import {eventTriggers} from './event-triggers';
+import {initializeContainer} from './core/di';
 
 // Set timezone to UTC
 process.env.TZ = 'UTC';
 
 // Initialize Firebase Admin
 initializeApp();
+
+// Initialize DI Container
+initializeContainer();
 
 // API app
 exports.api = onRequest(
