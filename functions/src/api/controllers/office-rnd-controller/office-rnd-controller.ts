@@ -18,7 +18,7 @@ class OfficeRndController implements Controller {
     private readonly sendgridService: SendgridService
   ) {}
   initialize(httpServer: HttpServer): void {
-    httpServer.get('/webhook/office-rnd', this.handleWebhook.bind(this));
+    httpServer.post('/webhook/office-rnd', this.handleWebhook.bind(this));
     httpServer.get(
       '/initialize/office-rnd',
       this.initializeOfficeRnd.bind(this)
