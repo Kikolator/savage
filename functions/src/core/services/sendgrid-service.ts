@@ -16,7 +16,7 @@ import {
   OfficeRndMember,
 } from '../data/models';
 import {AppError, ErrorCode} from '../errors/app-error';
-import {firebaseSecrets} from '../config/firebase-secrets';
+import {getConfig} from '../config';
 import {isDevelopment} from '../utils/environment';
 import {OfficeRndMemberStatus} from '../data/enums';
 
@@ -41,7 +41,8 @@ export class SendgridService {
 
   private initialize() {
     if (!this.apiKey) {
-      this.apiKey = firebaseSecrets.sendgridApiKey.value();
+      const config = getConfig();
+      this.apiKey = config.sendgrid.apiKey;
     }
     if (!this.client) {
       this.client = new Client();

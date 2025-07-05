@@ -1,6 +1,6 @@
 import {logger} from 'firebase-functions';
 
-import {officeRndConfig} from '../config/office-rnd-config';
+import {AppConfig, getConfig} from '../config';
 import {
   OfficeRndCompany,
   OfficeRndLocation,
@@ -15,7 +15,6 @@ import {
   SetDoc,
 } from '../data/models';
 import {AppError, ErrorCode} from '../errors/app-error';
-import {firebaseSecrets} from '../config/firebase-secrets';
 import {isDevelopment} from '../utils/environment';
 import {OfficeRndMemberStatus} from '../data/enums';
 
@@ -23,6 +22,7 @@ import {FirestoreService} from './firestore-service';
 
 export default class OfficeRndService {
   private token: OfficeRndTokenResponse | null = null;
+  private readonly config: AppConfig;
   public static readonly metadataCollection = 'officeRndMetadata';
   public static readonly tokenDocumentId = 'token';
   public static readonly opportunityStatusesCollection =
@@ -30,11 +30,14 @@ export default class OfficeRndService {
   public static readonly opportunitiesCollection = 'officeRndOpportunities';
   public static readonly membersCollection = 'officeRndMembers';
   public static readonly companiesCollection = 'officeRndCompanies';
+
   constructor(
     private readonly params: {
       firestoreService: FirestoreService;
     }
-  ) {}
+  ) {
+    this.config = getConfig();
+  }
 
   /**
    * Generic method to handle paginated API calls to Office Rnd
@@ -69,7 +72,8 @@ export default class OfficeRndService {
       logger.debug(`${methodName} - Fetching page ${pageCount}`);
 
       // Build URL with endpoint and parameters
-      let url = `${officeRndConfig.apiV2url}/${officeRndConfig.orgSlug}/${endpoint}`;
+
+      let url = `${this.config.officeRnd.apiV2url}/${this.config.officeRnd.orgSlug}/${endpoint}`;
       const params = new URLSearchParams();
 
       // Add additional parameters if provided
@@ -178,7 +182,9 @@ export default class OfficeRndService {
 
       // Refresh token if expired
       if (tokenExpiry < now) {
-        await this._getAndSaveToken(firebaseSecrets.officeRndSecretKey.value());
+        await this._getAndSaveToken(
+          this.config.firebase.secrets.officeRndSecretKey.value()
+        );
 
         // Get the new token from firestore
         this.token = (await this.params.firestoreService.getDocument(
@@ -194,7 +200,7 @@ export default class OfficeRndService {
       if (error instanceof AppError) {
         if (error.code === ErrorCode.DOCUMENT_NOT_FOUND) {
           await this._getAndSaveToken(
-            firebaseSecrets.officeRndSecretKey.value()
+            this.config.firebase.secrets.officeRndSecretKey.value()
           );
           await this.initializeToken();
           return;
@@ -227,9 +233,9 @@ export default class OfficeRndService {
     }
 
     // Get config for Office Rnd.
-    const clientId = officeRndConfig.clientId;
-    const grantType = officeRndConfig.grantType;
-    const scopes = officeRndConfig.scopes;
+    const clientId = this.config.officeRnd.clientId;
+    const grantType = this.config.officeRnd.grantType;
+    const scopes = this.config.officeRnd.scopes;
     // Encode params.
     const encodedParams = new URLSearchParams();
     encodedParams.set('client_id', clientId);
@@ -281,7 +287,7 @@ export default class OfficeRndService {
       );
     }
     // Get member from Office Rnd.
-    const url = `${officeRndConfig.apiV2url}/${officeRndConfig.orgSlug}/members/${id}`;
+    const url = `${this.config.officeRnd.apiV2url}/${this.config.officeRnd.orgSlug}/members/${id}`;
     const options = {
       method: 'GET',
       headers: {
@@ -441,7 +447,7 @@ export default class OfficeRndService {
       );
     }
     // Update the member.
-    const url = `${officeRndConfig.apiV2url}/${officeRndConfig.orgSlug}/members/${id}`;
+    const url = `${this.config.officeRnd.apiV2url}/${this.config.officeRnd.orgSlug}/members/${id}`;
     const options = {
       method: 'PUT',
       headers: {
@@ -516,7 +522,7 @@ export default class OfficeRndService {
         500
       );
     }
-    const url = `${officeRndConfig.apiV2url}/${officeRndConfig.orgSlug}/members`;
+    const url = `${this.config.officeRnd.apiV2url}/${this.config.officeRnd.orgSlug}/members`;
     const options = {
       method: 'POST',
       headers: {
@@ -599,7 +605,7 @@ export default class OfficeRndService {
       );
     }
 
-    const url = `${officeRndConfig.apiV2url}/${officeRndConfig.orgSlug}/opportunity-statuses`;
+    const url = `${this.config.officeRnd.apiV2url}/${this.config.officeRnd.orgSlug}/opportunity-statuses`;
     const options = {
       method: 'GET',
       headers: {
@@ -742,7 +748,7 @@ export default class OfficeRndService {
         500
       );
     }
-    const url = `${officeRndConfig.apiV2url}/${officeRndConfig.orgSlug}/opportunities/${id}`;
+    const url = `${this.config.officeRnd.apiV2url}/${this.config.officeRnd.orgSlug}/opportunities/${id}`;
     const options = {
       method: 'PUT',
       headers: {
@@ -796,7 +802,7 @@ export default class OfficeRndService {
         500
       );
     }
-    const url = `${officeRndConfig.apiV2url}/${officeRndConfig.orgSlug}/opportunities`;
+    const url = `${this.config.officeRnd.apiV2url}/${this.config.officeRnd.orgSlug}/opportunities`;
     const options = {
       method: 'POST',
       headers: {
@@ -849,7 +855,7 @@ export default class OfficeRndService {
         500
       );
     }
-    const url = `${officeRndConfig.apiV2url}/${officeRndConfig.orgSlug}/payments`;
+    const url = `${this.config.officeRnd.apiV2url}/${this.config.officeRnd.orgSlug}/payments`;
 
     const options = {
       method: 'POST',
@@ -860,7 +866,7 @@ export default class OfficeRndService {
       },
       body: JSON.stringify({
         date: params.issueDate,
-        location: officeRndConfig.defaultLocationId,
+        location: this.config.officeRnd.defaultLocationId,
         lines: params.paymentLines,
         member: params.memberId,
         company: params.companyId,
@@ -933,7 +939,7 @@ export default class OfficeRndService {
     } = {
       name: params.feeName,
       issueDate: params.issueDate.toDateString(),
-      location: officeRndConfig.defaultLocationId,
+      location: this.config.officeRnd.defaultLocationId,
       plan: params.planId,
       price: params.price,
       member: params.memberId,
@@ -942,7 +948,7 @@ export default class OfficeRndService {
       bodyObject.company = params.companyId;
     }
 
-    const url = `${officeRndConfig.apiV2url}/${officeRndConfig.orgSlug}/fees`;
+    const url = `${this.config.officeRnd.apiV2url}/${this.config.officeRnd.orgSlug}/fees`;
     const options = {
       method: 'POST',
       headers: {

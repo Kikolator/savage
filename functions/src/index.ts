@@ -2,9 +2,8 @@ import {initializeApp} from 'firebase-admin/app';
 import {onRequest} from 'firebase-functions/v2/https';
 
 import {scheduledEvents} from './scheduled-events';
-import {mainConfig} from './core/config/main-config';
+import {getConfig} from './core/config';
 import apiApp from './api';
-import {firebaseSecrets} from './core/config/firebase-secrets';
 import {callableFunctions, trialdayMigrationFunctions} from './app-functions';
 import {eventTriggers} from './event-triggers';
 import {initializeContainer} from './core/di';
@@ -19,15 +18,16 @@ initializeApp();
 initializeContainer();
 
 // API app
+const config = getConfig();
 exports.api = onRequest(
   {
-    region: mainConfig.cloudFunctionsLocation,
+    region: config.firebase.region,
     secrets: [
-      firebaseSecrets.typeformSecretKey,
-      firebaseSecrets.officeRndSecretKey,
-      firebaseSecrets.sendgridApiKey,
-      firebaseSecrets.officeRndWebhookSecret,
-      firebaseSecrets.savageSecret,
+      config.firebase.secrets.typeformSecretKey,
+      config.firebase.secrets.officeRndSecretKey,
+      config.firebase.secrets.sendgridApiKey,
+      config.firebase.secrets.officeRndWebhookSecret,
+      config.firebase.secrets.savageSecret,
     ],
   },
   apiApp
