@@ -24,8 +24,8 @@ export interface TypedServiceContainer {
 }
 
 export class DIContainer implements ServiceContainer, TypedServiceContainer {
-  private services = new Map<string, () => any>();
-  private singletons = new Map<string, any>();
+  private services = new Map<string, () => unknown>();
+  private singletons = new Map<string, unknown>();
 
   /**
    * Register a service factory function
@@ -46,7 +46,7 @@ export class DIContainer implements ServiceContainer, TypedServiceContainer {
       if (!this.singletons.has(key)) {
         this.singletons.set(key, factory());
       }
-      return this.singletons.get(key);
+      return this.singletons.get(key) as T;
     });
   }
 
@@ -60,7 +60,7 @@ export class DIContainer implements ServiceContainer, TypedServiceContainer {
     if (!factory) {
       throw new Error(`Service '${key}' not registered in DI container`);
     }
-    return factory();
+    return factory() as T;
   }
 
   /**

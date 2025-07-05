@@ -1,7 +1,10 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Example usage of the DI container
  * This file demonstrates how to use the ServiceResolver in different scenarios
  */
+
+import {logger} from 'firebase-functions/v2';
 
 import {ServiceResolver} from './service-resolver';
 
@@ -15,6 +18,7 @@ export class ExampleController {
     // Use the services (example methods - adjust based on actual service methods)
     // const result = await trialdayService.getTrialday('some-id');
     // await emailService.sendConfirmationEmail('user@example.com');
+    logger.info('exampleController', {trialdayService, emailService});
 
     return {message: 'Example controller'};
   }
@@ -68,5 +72,6 @@ export const exampleEventTrigger = async (change: any) => {
   if (change.after.data().status === 'completed') {
     // await trialdayService.confirm(change.after.data());
     // await rewardService.processDueRewards();
+    logger.info('exampleEventTrigger', {trialdayService, rewardService});
   }
 };
