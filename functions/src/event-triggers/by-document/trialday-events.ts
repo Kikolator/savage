@@ -88,6 +88,8 @@ export class TrialdayEvents implements InitializeEventTriggers {
                     opportunityId: opportunity._id,
                   });
                 }
+                // Update trialday status to confirmed.
+                await this.trialdayService.confirm(trialdayAfter);
                 break;
               }
               case TrialdayStatus.COMPLETED:
