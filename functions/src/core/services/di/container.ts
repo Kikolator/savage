@@ -1,14 +1,14 @@
 import {logger} from 'firebase-functions';
 
-import {FirestoreService} from '../services/firestore-service';
-import {SendgridService} from '../services/sendgrid-service';
-import {TrialdayService} from '../services/trialday-service';
-import {EmailConfirmationService} from '../services/email-confirmation-service';
-import OfficeRndService from '../services/office-rnd-service';
-import {ReferralService} from '../services/referral-service';
-import {RewardService} from '../services/reward-service';
-import {BankPayoutService} from '../services/bank-payout-service';
-import {TrialdayMigrationService} from '../services/trialday-migration-service';
+import {FirestoreService} from '../firestore-service';
+import {SendgridService} from '../sendgrid-service';
+import {TrialdayService} from '../trialday-service';
+import {EmailConfirmationService} from '../email-confirmation-service';
+import OfficeRndService from '../office-rnd-service';
+import {ReferralService} from '../referral-service';
+import {RewardService} from '../reward-service';
+import {BankPayoutService} from '../bank-payout-service';
+import {TrialdayMigrationService} from '../trialday-migration-service';
 
 export interface ServiceContainer {
   resolve<T>(key: string): T;

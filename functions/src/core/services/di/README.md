@@ -18,7 +18,7 @@ The DI container provides a centralized way to manage service dependencies, maki
 ### Basic Usage
 
 ```typescript
-import {ServiceResolver} from '../../core/di';
+import {ServiceResolver} from './index';
 
 // Get a service with proper TypeScript types
 const trialdayService = ServiceResolver.getTrialdayService();
@@ -28,7 +28,7 @@ const firestoreService = ServiceResolver.getFirestoreService();
 ### In Controllers
 
 ```typescript
-import {ServiceResolver} from '../../core/di';
+import {ServiceResolver} from './index';
 
 export class MyController implements Controller {
   initialize(httpServer: HttpServer): void {
@@ -43,7 +43,7 @@ export class MyController implements Controller {
 ### In Callable Functions
 
 ```typescript
-import {ServiceResolver} from '../../core/di';
+import {ServiceResolver} from './index';
 
 export const myCallableFunction = onCall(async (request) => {
   const referralService = ServiceResolver.getReferralService();
@@ -80,7 +80,7 @@ The following services are available through the DI container:
 The DI container supports testing through the `clear()` method:
 
 ```typescript
-import {DIContainer} from '../../core/di/container';
+import {DIContainer} from './container';
 
 describe('MyService', () => {
   let container: DIContainer;

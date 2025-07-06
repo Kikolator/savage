@@ -1,4 +1,4 @@
-import {ServiceResolver} from '../../core/di';
+import {ServiceResolver} from '../../core/services/di';
 
 import TestController from './test-controllers/test-controller';
 import TypeformController from './typeform-controller/typeform-controller';

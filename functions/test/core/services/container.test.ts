@@ -1,6 +1,6 @@
 import {describe, it, expect, beforeEach, afterEach} from '@jest/globals';
 
-import {DIContainer} from './container';
+import {DIContainer} from '../../../src/core/services/di/container';
 
 describe('DIContainer', () => {
   let container: DIContainer;

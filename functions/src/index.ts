@@ -6,7 +6,7 @@ import {getConfig} from './core/config';
 import apiApp from './api';
 import {callableFunctions, trialdayMigrationFunctions} from './app-functions';
 import {eventTriggers} from './event-triggers';
-import {initializeContainer} from './core/di';
+import {initializeContainer} from './core/services/di';
 
 // Set timezone to UTC
 process.env.TZ = 'UTC';

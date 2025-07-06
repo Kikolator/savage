@@ -8,7 +8,7 @@ import {
 } from '../initialize-callable-functions';
 import {mainConfig} from '../../core/config/main-config';
 import {CreateReferralCodeCallData} from '../../core/data/models/referral-code/create-referral-code-call-data';
-import {ServiceResolver} from '../../core/di';
+import {ServiceResolver} from '../../core/services/di';
 import {ReferrerType} from '../../core/data/enums';
 import {AppError, ErrorCode} from '../../core/errors/app-error';
 
