@@ -2,22 +2,24 @@ import {jest, describe, it, expect, beforeEach, afterAll} from '@jest/globals';
 
 import {
   getConfig,
+  getConfigForEnvironment,
+  clearConfigCache,
   isDevelopment,
   isProduction,
   isStaging,
+  isTest,
 } from '../../../src/core/config/app-config';
 
 describe('App Config', () => {
   const originalEnv = process.env;
 
   beforeEach(() => {
-    jest.resetModules();
+    clearConfigCache();
     process.env = {...originalEnv};
-    // Clear any cached config
-    jest.clearAllMocks();
   });
 
   afterAll(() => {
+    clearConfigCache();
     process.env = originalEnv;
   });
 
@@ -35,22 +37,78 @@ describe('App Config', () => {
       expect(config.urls).toBeDefined();
     });
 
-    it('should return the same config instance on multiple calls', () => {
+    it('should return the same config instance on multiple calls for same environment', () => {
       const config1 = getConfig();
       const config2 = getConfig();
 
       expect(config1).toBe(config2);
     });
 
-    it('should have correct default values', () => {
-      const config = getConfig();
+    it('should have correct default values for development', () => {
+      // Clear FIREBASE_PROJECT_ID to test default value
+      const originalProjectId = process.env.FIREBASE_PROJECT_ID;
+      delete process.env.FIREBASE_PROJECT_ID;
 
+      const config = getConfigForEnvironment('development');
       expect(config.firebase.projectId).toBe('savage-coworking');
       expect(config.firebase.region).toBe('europe-west1');
       expect(config.cors.allowedOrigins).toContain('http://localhost:3000');
+      expect(config.cors.allowedOrigins).toContain('http://localhost:8080');
+
+      // Restore original value
+      if (originalProjectId) {
+        process.env.FIREBASE_PROJECT_ID = originalProjectId;
+      }
+    });
+  });
+
+  describe('getConfigForEnvironment', () => {
+    it('should return test config when environment is test', () => {
+      const config = getConfigForEnvironment('test');
+
+      expect(config.environment).toBe('test');
+      expect(config.firebase.projectId).toBe('test-project');
+      expect(config.cors.allowedOrigins).toEqual(['http://localhost:3000']);
+    });
+
+    it('should return production config when environment is production', () => {
+      const config = getConfigForEnvironment('production');
+
+      expect(config.environment).toBe('production');
       expect(config.cors.allowedOrigins).toContain(
         'https://savage-coworking.com'
       );
+      expect(config.cors.allowedOrigins).toContain(
+        'https://*.savage-coworking.com'
+      );
+    });
+
+    it('should return staging config when environment is staging', () => {
+      const config = getConfigForEnvironment('staging');
+
+      expect(config.environment).toBe('staging');
+      expect(config.cors.allowedOrigins).toContain('http://localhost:3000');
+      expect(config.cors.allowedOrigins).toContain(
+        'https://staging.savage-coworking.com'
+      );
+    });
+
+    it('should return development config when environment is development', () => {
+      const config = getConfigForEnvironment('development');
+
+      expect(config.environment).toBe('development');
+      expect(config.cors.allowedOrigins).toContain('http://localhost:3000');
+      expect(config.cors.allowedOrigins).toContain('http://localhost:8080');
+    });
+  });
+
+  describe('clearConfigCache', () => {
+    it('should clear the config cache', () => {
+      const config1 = getConfig();
+      clearConfigCache();
+      const config2 = getConfig();
+
+      expect(config1).not.toBe(config2);
     });
   });
 
@@ -60,6 +118,7 @@ describe('App Config', () => {
       expect(isDevelopment()).toBe(true);
       expect(isProduction()).toBe(false);
       expect(isStaging()).toBe(false);
+      expect(isTest()).toBe(false);
     });
 
     it('should correctly identify production environment', () => {
@@ -67,6 +126,7 @@ describe('App Config', () => {
       expect(isDevelopment()).toBe(false);
       expect(isProduction()).toBe(true);
       expect(isStaging()).toBe(false);
+      expect(isTest()).toBe(false);
     });
 
     it('should correctly identify staging environment', () => {
@@ -74,6 +134,15 @@ describe('App Config', () => {
       expect(isDevelopment()).toBe(false);
       expect(isProduction()).toBe(false);
       expect(isStaging()).toBe(true);
+      expect(isTest()).toBe(false);
+    });
+
+    it('should correctly identify test environment', () => {
+      process.env.NODE_ENV = 'test';
+      expect(isDevelopment()).toBe(false);
+      expect(isProduction()).toBe(false);
+      expect(isStaging()).toBe(false);
+      expect(isTest()).toBe(true);
     });
 
     it('should default to development when NODE_ENV is not set', () => {
@@ -81,6 +150,7 @@ describe('App Config', () => {
       expect(isDevelopment()).toBe(true);
       expect(isProduction()).toBe(false);
       expect(isStaging()).toBe(false);
+      expect(isTest()).toBe(false);
     });
 
     it('should handle unknown environment values', () => {
@@ -88,6 +158,7 @@ describe('App Config', () => {
       expect(isDevelopment()).toBe(true);
       expect(isProduction()).toBe(false);
       expect(isStaging()).toBe(false);
+      expect(isTest()).toBe(false);
     });
   });
 });

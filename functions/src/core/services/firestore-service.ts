@@ -131,7 +131,7 @@ export class FirestoreService {
         ...data.data,
         updated_at: FieldValue.serverTimestamp(),
       },
-      {merge: data.merge || true}
+      {merge: data.merge !== undefined ? data.merge : true}
     );
   }
 
@@ -159,7 +159,7 @@ export class FirestoreService {
           ...doc.data,
           updated_at: FieldValue.serverTimestamp(),
         },
-        {merge: doc.merge || true}
+        {merge: doc.merge !== undefined ? doc.merge : true}
       );
     });
     await batch.commit();

@@ -28,7 +28,7 @@ describe('DIContainer', () => {
       return {id: callCount};
     };
 
-    container.registerSingleton('singleton', factory);
+    container.registerSingletonFactory('singleton', factory);
 
     const first = container.resolve('singleton');
     const second = container.resolve('singleton');
@@ -40,7 +40,7 @@ describe('DIContainer', () => {
   it('should throw error when resolving unregistered service', () => {
     expect(() => {
       container.resolve('unregistered');
-    }).toThrow(/Service 'unregistered' not registered in DI container/);
+    }).toThrow(/Service "unregistered" not found/);
   });
 
   it('should check if service is registered', () => {

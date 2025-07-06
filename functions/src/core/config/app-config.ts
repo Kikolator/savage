@@ -3,7 +3,7 @@ import {defineSecret} from 'firebase-functions/params';
 /**
  * Environment types
  */
-export type Environment = 'development' | 'staging' | 'production';
+export type Environment = 'development' | 'staging' | 'production' | 'test';
 
 /**
  * Firebase secrets configuration
@@ -101,6 +101,7 @@ export function getEnvironment(): Environment {
   const env = process.env.NODE_ENV || 'development';
   if (env === 'production') return 'production';
   if (env === 'staging') return 'staging';
+  if (env === 'test') return 'test';
   return 'development';
 }
 
@@ -126,6 +127,13 @@ export function isStaging(): boolean {
 }
 
 /**
+ * Check if current environment is test
+ */
+export function isTest(): boolean {
+  return getEnvironment() === 'test';
+}
+
+/**
  * Firebase secrets
  */
 export const firebaseSecrets: FirebaseSecrets = {
@@ -137,111 +145,184 @@ export const firebaseSecrets: FirebaseSecrets = {
 };
 
 /**
- * Main application configuration
+ * Create configuration for a specific environment
  */
-export const appConfig: AppConfig = {
-  environment: getEnvironment(),
-
-  firebase: {
-    projectId: process.env.FIREBASE_PROJECT_ID || 'savage-coworking',
-    region: 'europe-west1',
-    secrets: firebaseSecrets,
-  },
-
-  sendgrid: {
-    apiKey: firebaseSecrets.sendgridApiKey.value(),
-    fromEmail: 'noreply@savage-coworking.com',
-    templates: {
-      trialdayConfirmation: 'd-25105204bd734ff49bcfb6dbd3ce4deb',
-      trialdayFollowUp: 'd-9ec3822395524358888396e6ae56d260',
+function createConfig(environment: Environment): AppConfig {
+  const baseConfig = {
+    environment,
+    firebase: {
+      projectId: process.env.FIREBASE_PROJECT_ID || 'savage-coworking',
+      region: 'europe-west1',
+      secrets: firebaseSecrets,
     },
-  },
-
-  officeRnd: {
-    clientId: 'ijlB4RjrVR0nYx9U',
-    grantType: 'client_credentials',
-    scopes:
-      'officernd.api.read officernd.api.write flex.billing.payments.create flex.community.members.read flex.community.members.create flex.community.members.update flex.community.companies.read flex.community.companies.create flex.community.companies.update flex.community.opportunities.read flex.community.opportunities.create flex.community.opportunities.update flex.community.opportunityStatuses.read flex.space.locations.read',
-    orgSlug: 'savage-coworking',
-    apiV2url: 'https://app.officernd.com/api/v2/organizations',
-    defaultLocationId: '5d1bcda0dbd6e40010479eec',
-    defaultReferralPlanId: '68544dc51579c137fb109286',
-  },
-
-  typeform: {
-    ids: {
-      trialDay: 'iqIU10kN',
+    sendgrid: {
+      apiKey: firebaseSecrets.sendgridApiKey.value(),
+      fromEmail: 'noreply@savage-coworking.com',
+      templates: {
+        trialdayConfirmation: 'd-25105204bd734ff49bcfb6dbd3ce4deb',
+        trialdayFollowUp: 'd-9ec3822395524358888396e6ae56d260',
+      },
     },
-  },
+    officeRnd: {
+      clientId: 'ijlB4RjrVR0nYx9U',
+      grantType: 'client_credentials',
+      scopes:
+        'officernd.api.read officernd.api.write flex.billing.payments.create flex.community.members.read flex.community.members.create flex.community.members.update flex.community.companies.read flex.community.companies.create flex.community.companies.update flex.community.opportunities.read flex.community.opportunities.create flex.community.opportunities.update flex.community.opportunityStatuses.read flex.space.locations.read',
+      orgSlug: 'savage-coworking',
+      apiV2url: 'https://app.officernd.com/api/v2/organizations',
+      defaultLocationId: '5d1bcda0dbd6e40010479eec',
+      defaultReferralPlanId: '68544dc51579c137fb109286',
+    },
+    typeform: {
+      ids: {
+        trialDay: 'iqIU10kN',
+      },
+    },
+    rateLimit: {
+      windowMs: 15 * 60 * 1000, // 15 minutes
+      maxRequests: 100,
+      message: 'Too many requests from this IP, please try again later.',
+    },
+    urls: {
+      googleReview: 'https://g.page/r/CWkHAQxtLGElEBM/review',
+      website: 'https://savage-coworking.com',
+    },
+  };
 
-  cors: {
-    allowedOrigins: [
-      'http://localhost:3000',
-      'http://localhost:8080',
-      'https://savage-coworking.com',
-      'https://*.savage-coworking.com',
-    ],
-    credentials: true,
-    optionsSuccessStatus: 200,
-  },
+  // Environment-specific overrides
+  switch (environment) {
+    case 'test':
+      return {
+        ...baseConfig,
+        firebase: {
+          ...baseConfig.firebase,
+          projectId: 'test-project',
+        },
+        cors: {
+          allowedOrigins: ['http://localhost:3000'],
+          credentials: true,
+          optionsSuccessStatus: 200,
+        },
+      };
+    case 'development':
+      return {
+        ...baseConfig,
+        cors: {
+          allowedOrigins: ['http://localhost:3000', 'http://localhost:8080'],
+          credentials: true,
+          optionsSuccessStatus: 200,
+        },
+      };
+    case 'production':
+      return {
+        ...baseConfig,
+        cors: {
+          allowedOrigins: [
+            'https://savage-coworking.com',
+            'https://*.savage-coworking.com',
+          ],
+          credentials: true,
+          optionsSuccessStatus: 200,
+        },
+      };
+    case 'staging':
+      return {
+        ...baseConfig,
+        cors: {
+          allowedOrigins: [
+            'http://localhost:3000',
+            'https://staging.savage-coworking.com',
+          ],
+          credentials: true,
+          optionsSuccessStatus: 200,
+        },
+      };
+    default:
+      return {
+        ...baseConfig,
+        cors: {
+          allowedOrigins: [
+            'http://localhost:3000',
+            'http://localhost:8080',
+            'https://savage-coworking.com',
+            'https://*.savage-coworking.com',
+          ],
+          credentials: true,
+          optionsSuccessStatus: 200,
+        },
+      };
+  }
+}
 
-  rateLimit: {
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    maxRequests: 100,
-    message: 'Too many requests from this IP, please try again later.',
-  },
-
-  urls: {
-    googleReview: 'https://g.page/r/CWkHAQxtLGElEBM/review',
-    website: 'https://savage-coworking.com',
-  },
-};
+// Cache for different environments
+const configCache = new Map<Environment, AppConfig>();
 
 /**
- * Get configuration for a specific environment
+ * Get configuration for current environment (cached)
  */
 export function getConfig(): AppConfig {
-  return appConfig;
+  const environment = getEnvironment();
+
+  if (!configCache.has(environment)) {
+    configCache.set(environment, createConfig(environment));
+  }
+
+  return configCache.get(environment)!;
+}
+
+/**
+ * Get configuration for a specific environment (for testing)
+ */
+export function getConfigForEnvironment(environment: Environment): AppConfig {
+  // Always create a fresh config for the specified environment
+  return createConfig(environment);
+}
+
+/**
+ * Clear config cache (for testing)
+ */
+export function clearConfigCache(): void {
+  configCache.clear();
 }
 
 /**
  * Get Firebase configuration
  */
 export function getFirebaseConfig(): FirebaseConfig {
-  return appConfig.firebase;
+  return getConfig().firebase;
 }
 
 /**
  * Get SendGrid configuration
  */
 export function getSendGridConfig(): SendGridConfig {
-  return appConfig.sendgrid;
+  return getConfig().sendgrid;
 }
 
 /**
  * Get OfficeRnd configuration
  */
 export function getOfficeRndConfig(): OfficeRndConfig {
-  return appConfig.officeRnd;
+  return getConfig().officeRnd;
 }
 
 /**
  * Get Typeform configuration
  */
 export function getTypeformConfig(): TypeformConfig {
-  return appConfig.typeform;
+  return getConfig().typeform;
 }
 
 /**
  * Get CORS configuration
  */
 export function getCorsConfig(): CorsConfig {
-  return appConfig.cors;
+  return getConfig().cors;
 }
 
 /**
  * Get rate limiting configuration
  */
 export function getRateLimitConfig(): RateLimitConfig {
-  return appConfig.rateLimit;
+  return getConfig().rateLimit;
 }

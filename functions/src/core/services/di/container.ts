@@ -37,17 +37,45 @@ export class DIContainer implements ServiceContainer, TypedServiceContainer {
   }
 
   /**
+   * Register a singleton service instance
+   * @param key - Service identifier
+   * @param instance - The service instance to register as singleton
+   */
+  registerSingleton<T>(key: string, instance: T): void {
+    if (instance === null || instance === undefined) {
+      throw new Error('Service instance cannot be null or undefined');
+    }
+    this.singletons.set(key, instance);
+    this.services.set(key, () => this.singletons.get(key) as T);
+  }
+
+  /**
    * Register a singleton service factory function
    * @param key - Service identifier
    * @param factory - Factory function that creates the service (will only be called once)
    */
-  registerSingleton<T>(key: string, factory: () => T): void {
+  registerSingletonFactory<T>(key: string, factory: () => T): void {
+    if (factory === null || factory === undefined) {
+      throw new Error('Service factory cannot be null or undefined');
+    }
     this.services.set(key, () => {
       if (!this.singletons.has(key)) {
         this.singletons.set(key, factory());
       }
       return this.singletons.get(key) as T;
     });
+  }
+
+  /**
+   * Register an instance service factory function
+   * @param key - Service identifier
+   * @param factory - Factory function that creates a new instance each time
+   */
+  registerInstance<T>(key: string, factory: () => T): void {
+    if (factory === null || factory === undefined) {
+      throw new Error('Service factory cannot be null or undefined');
+    }
+    this.services.set(key, factory);
   }
 
   /**
@@ -58,7 +86,7 @@ export class DIContainer implements ServiceContainer, TypedServiceContainer {
   resolve<T>(key: string): T {
     const factory = this.services.get(key);
     if (!factory) {
-      throw new Error(`Service '${key}' not registered in DI container`);
+      throw new Error(`Service "${key}" not found`);
     }
     return factory() as T;
   }
@@ -93,10 +121,12 @@ export function initializeContainer(): void {
   logger.info('Initializing DI container');
 
   // Register shared services as singletons
-  container.registerSingleton('firestore', () =>
+  container.registerSingletonFactory('firestore', () =>
     FirestoreService.getInstance()
   );
-  container.registerSingleton('sendgrid', () => SendgridService.getInstance());
+  container.registerSingletonFactory('sendgrid', () =>
+    SendgridService.getInstance()
+  );
 
   // Register business services
   container.register(

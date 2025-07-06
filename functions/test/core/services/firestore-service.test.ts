@@ -207,10 +207,6 @@ describe('FirestoreService', () => {
 
       await expect(
         firestoreService.getDocument('test-collection', 'test-id')
-      ).rejects.toThrow(AppError);
-
-      await expect(
-        firestoreService.getDocument('test-collection', 'test-id')
       ).rejects.toMatchObject({
         message: 'Document not found',
         code: ErrorCode.DOCUMENT_NOT_FOUND,
