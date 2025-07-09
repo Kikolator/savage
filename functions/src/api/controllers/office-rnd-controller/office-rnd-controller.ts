@@ -5,7 +5,7 @@ import {RequestHandler} from 'express';
 
 import {Controller, HttpServer} from '..';
 import {firebaseSecrets} from '../../../core/config/firebase-secrets';
-import {AppError, ErrorCode} from '../../../core/errors/app-error';
+import {OfficeRndControllerError} from '../../../core/errors';
 import OfficeRndService from '../../../core/services/office-rnd-service';
 import {FirestoreService} from '../../../core/services/firestore-service';
 import {SendgridService} from '../../../core/services/sendgrid-service';
@@ -86,13 +86,8 @@ class OfficeRndController implements Controller {
         await this.handleMemberRemoved(data);
         break;
       default:
-        logger.error('OfficeRndController.handleWebhook: unknown event type', {
-          eventType,
-        });
-        throw new AppError(
-          'OfficeRndController.handleWebhook: unknown event type',
-          ErrorCode.OFFICERND_UNKNOWN_EVENT,
-          500
+        logger.warn(
+          `OfficeRndController.handleWebhook: unknown event type: ${eventType}`
         );
     }
     next();
@@ -103,10 +98,10 @@ class OfficeRndController implements Controller {
     officeRndSignature: string | undefined
   ): void {
     if (!officeRndSignature) {
-      throw new AppError(
-        'OfficeRndController.handleWebhook: no office rnd signature found',
-        ErrorCode.OFFICERND_WEBHOOK_INVALID_SIGNATURE,
-        401
+      throw new OfficeRndControllerError(
+        'No office rnd signature found in header',
+        401,
+        'verifyOfficeRndSignature'
       );
     }
 
@@ -126,10 +121,10 @@ class OfficeRndController implements Controller {
       .digest('hex');
 
     if (mySignature !== signature) {
-      throw new AppError(
-        'OfficeRndController.handleWebhook: invalid signature',
-        ErrorCode.OFFICERND_WEBHOOK_INVALID_SIGNATURE,
-        401
+      throw new OfficeRndControllerError(
+        'Invalid signature for webhook. server and client are out of sync.',
+        401,
+        'verifyOfficeRndSignature'
       );
     }
   }
@@ -313,10 +308,10 @@ class OfficeRndController implements Controller {
     // Verify caller by checking the secret.
     const secret = request.headers['savage-secret'];
     if (secret !== firebaseSecrets.savageSecret.value()) {
-      throw new AppError(
-        'OfficeRndController.initializeOfficeRnd: invalid secret',
-        ErrorCode.UNAUTHORIZED,
-        401
+      throw new OfficeRndControllerError(
+        'Invalid secret for initializeOfficeRnd. This endpoint is only accessible to Savage.',
+        401,
+        'initializeOfficeRnd'
       );
     }
     // Call is verified, respond 200;
