@@ -9,7 +9,15 @@ import {OfficeRndControllerError} from '../../../core/errors';
 import OfficeRndService from '../../../core/services/office-rnd-service';
 import {FirestoreService} from '../../../core/services/firestore-service';
 import {SendgridService} from '../../../core/services/sendgrid-service';
-import {OfficeRndMember} from '../../../core/data/models';
+import { OfficeRndMember } from '../../../core/data/models';
+
+interface OfficeRndWebhookBody {
+  eventType: string;
+  data: {
+    object: Record<string, any>;
+    previousAttributes: Record<string, any>;
+  }
+}
 
 class OfficeRndController implements Controller {
   constructor(
@@ -24,6 +32,7 @@ class OfficeRndController implements Controller {
       this.initializeOfficeRnd.bind(this)
     );
     httpServer.get('/backup-status', this.getBackupStatus.bind(this));
+    httpServer.post('/cleanup-faulty-webhooks', this.cleanupFaultyWebhooks.bind(this));
   }
 
   private handleWebhook: RequestHandler = async (request, response, next) => {
@@ -40,7 +49,7 @@ class OfficeRndController implements Controller {
     // Send 200 OK response to OfficeRnd first
     response.status(200).send('OK');
 
-    const {eventType, data} = body;
+    const {eventType, data} = body as OfficeRndWebhookBody;
 
     switch (eventType) {
       case 'membership.created':
@@ -71,19 +80,19 @@ class OfficeRndController implements Controller {
         logger.info('OfficeRndController.handleWebhook: member created', {
           data,
         });
-        await this.handleMemberCreated(data);
+        await this.handleMemberCreated(data.object as OfficeRndMember);
         break;
       case 'member.updated':
         logger.info('OfficeRndController.handleWebhook: member updated', {
           data,
         });
-        await this.handleMemberUpdated(data);
+        await this.handleMemberUpdated(data.object as OfficeRndMember);
         break;
       case 'member.removed':
         logger.info('OfficeRndController.handleWebhook: member removed', {
           data,
         });
-        await this.handleMemberRemoved(data);
+        await this.handleMemberRemoved(data.object as OfficeRndMember);
         break;
       default:
         logger.warn(
@@ -218,6 +227,92 @@ class OfficeRndController implements Controller {
       // Don't throw to avoid breaking the webhook
     }
   }
+
+  /**
+   * Cleanup faulty webhook documents that were created with OfficeRndWebhookBody.data structure
+   * instead of OfficeRndMember structure
+   */
+  public cleanupFaultyWebhooks: RequestHandler = async (request, response, next) => {
+    try {
+      logger.info('OfficeRndController.cleanupFaultyWebhooks: Starting cleanup of faulty webhook documents');
+
+      // Verify caller by checking the secret
+      const secret = request.headers['savage-secret'];
+      if (secret !== firebaseSecrets.savageSecret.value()) {
+        throw new OfficeRndControllerError(
+          'Invalid secret for cleanupFaultyWebhooks. This endpoint is only accessible to Savage.',
+          401,
+          'cleanupFaultyWebhooks'
+        );
+      }
+
+      // Get all documents from the members collection
+      const query = await this.firestoreService.getCollection(
+        OfficeRndService.membersCollection
+      );
+
+      const faultyDocuments: Array<{id: string; data: any}> = [];
+      const validDocuments: Array<{id: string; data: any}> = [];
+
+      query.forEach((documentData, documentId) => {
+        const data = documentData as any;
+        
+        // Check if this is a faulty document (has the webhook body structure)
+        // Faulty documents will have: { object: {...}, previousAttributes: {...} }
+        // Valid documents will have: { _id: string, ... }
+        if (data.data.object && data.data.previousAttributes) {
+          faultyDocuments.push({ id: String(documentId), data });
+        } else if (data._id) {
+          validDocuments.push({ id: String(documentId), data });
+        } else {
+          // Unknown structure, log for investigation
+          logger.warn('Unknown document structure found', {
+            documentId,
+            dataKeys: Object.keys(data),
+          });
+        }
+      });
+
+      logger.info('Cleanup analysis completed', {
+        totalDocuments: faultyDocuments.length + validDocuments.length,
+        faultyDocuments: faultyDocuments.length,
+        validDocuments: validDocuments.length,
+      });
+
+      // Delete faulty documents
+      if (faultyDocuments.length > 0) {
+        await this.firestoreService.runBatch(async (batch) => {
+          for (const faultyDoc of faultyDocuments) {
+            batch.delete(
+              this.firestoreService
+                .getFirestoreInstance()
+                .collection(OfficeRndService.membersCollection)
+                .doc(faultyDoc.id)
+            );
+          }
+        });
+
+        logger.info('Faulty documents deleted successfully', {
+          deletedCount: faultyDocuments.length,
+        });
+      }
+
+      const result = {
+        totalDocuments: faultyDocuments.length + validDocuments.length,
+        faultyDocumentsDeleted: faultyDocuments.length,
+        validDocumentsRemaining: validDocuments.length,
+        faultyDocumentIds: faultyDocuments.map(doc => doc.id),
+        message: `Successfully deleted ${faultyDocuments.length} faulty webhook documents`,
+      };
+
+      response.json(result);
+    } catch (error) {
+      logger.error('Failed to cleanup faulty webhooks', {
+        error: error instanceof Error ? error.message : 'unknown error',
+      });
+      next(error);
+    }
+  };
 
   /**
    * Get backup status and statistics
