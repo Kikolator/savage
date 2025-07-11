@@ -1,5 +1,5 @@
 import {jest} from '@jest/globals';
-import {Request, Response} from 'express';
+import {Request} from 'express';
 
 export interface MockRequest extends Partial<Request> {
   body?: any;
@@ -53,31 +53,69 @@ export const createMockCallableResponse = () => ({
   error: jest.fn(),
 });
 
-export const mockFirestoreDocument = (data: any = {}) => ({
-  exists: true,
-  data: () => data,
-  id: 'test-doc-id',
-  ref: {
+// Enhanced Firestore mocks for correct structure
+export const mockFirestoreDocument = (data: any = {}) => {
+  // For subcollection access, .collection returns a mock collection
+  const mockCollection = (subCollectionName: string) => ({
+    get: jest.fn().mockResolvedValue(mockFirestoreQuerySnapshot([])),
+    // You can extend this to allow custom docs for subcollections if needed
+  });
+  return {
+    exists: true,
+    data: () => data,
     id: 'test-doc-id',
-  },
-});
+    ref: {
+      id: 'test-doc-id',
+    },
+    collection: jest.fn(mockCollection),
+  };
+};
 
 export const mockFirestoreQuerySnapshot = (docs: any[] = []) => ({
   empty: docs.length === 0,
   size: docs.length,
   docs: docs.map((doc, index) => ({
-    ...mockFirestoreDocument(doc),
+    exists: true,
+    data: () => doc,
     id: `doc-${index}`,
+    ref: {id: `doc-${index}`},
+    // For subcollection access in tests
+    collection: jest.fn(() => ({
+      get: jest.fn().mockResolvedValue(mockFirestoreQuerySnapshot([])),
+    })),
   })),
   forEach: jest.fn((callback: any) => {
     docs.forEach((doc, index) => {
       callback({
-        ...mockFirestoreDocument(doc),
+        exists: true,
+        data: () => doc,
         id: `doc-${index}`,
+        ref: {id: `doc-${index}`},
+        collection: jest.fn(() => ({
+          get: jest.fn().mockResolvedValue(mockFirestoreQuerySnapshot([])),
+        })),
       });
     });
   }),
 });
+
+// Helper to create a mock collection with .get, .where, and .doc
+export const createMockCollection = (docs: any[] = []) => {
+  const querySnapshot = mockFirestoreQuerySnapshot(docs);
+  return {
+    get: jest.fn().mockResolvedValue(querySnapshot),
+    where: jest.fn(() => ({
+      get: jest.fn().mockResolvedValue(querySnapshot),
+      where: jest.fn(),
+    })),
+    doc: jest.fn((id?: string) =>
+      mockFirestoreDocument(docs.find((d) => d.id === id) || {})
+    ),
+    collection: jest.fn(() => ({
+      get: jest.fn().mockResolvedValue(mockFirestoreQuerySnapshot([])),
+    })),
+  };
+};
 
 export const createMockConfig = () => ({
   firebase: {
