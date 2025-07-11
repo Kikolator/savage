@@ -5,8 +5,7 @@ import {logger} from 'firebase-functions';
 
 import {Controller, HttpServer} from '..';
 // import { FirestoreService } from '../../../core/services/firestore-service';
-import {TYPEFORM_IDS} from '../../../core/config/typeform-ids';
-import {firebaseSecrets} from '../../../core/config/firebase-secrets';
+import {getConfig, STATIC_CONFIG} from '../../../core/config';
 import {TrialDayFormData, TypeformResponse} from '../../../core/data/models';
 import {TrialdayService} from '../../../core/services/trialday-service';
 import {AppError, ErrorCode} from '../../../core/errors/app-error';
@@ -19,15 +18,20 @@ class TypeformController implements Controller {
     string,
     (data: TypeformResponse) => Promise<void>
   > = new Map();
+  private readonly config: ReturnType<typeof getConfig>['runtime'];
 
   constructor(
     private readonly params: {
       trialdayService: TrialdayService;
     }
   ) {
+    // Get runtime config when controller is instantiated
+    const appConfig = getConfig();
+    this.config = appConfig.runtime;
+
     // Bind the handlers in the constructor
     TypeformController.formHandlers.set(
-      TYPEFORM_IDS.TRIAL_DAY,
+      STATIC_CONFIG.typeform.ids.trialDay,
       this.handleTrialDayForm.bind(this)
     );
   }
@@ -104,7 +108,7 @@ class TypeformController implements Controller {
     // parse the form data
     const formData = parseTypeformResponse<TrialDayFormData>(
       data,
-      TYPEFORM_IDS.TRIAL_DAY
+      STATIC_CONFIG.typeform.ids.trialDay
     );
 
     await this.params.trialdayService.handleTrialdayRequest(formData);
@@ -128,7 +132,7 @@ class TypeformController implements Controller {
         401
       );
     }
-    const secret = firebaseSecrets.typeformSecretKey.value();
+    const secret = this.config.typeform.secretKey;
     // Create HMAC and update with raw buffer
     const hmac = crypto.createHmac('sha256', secret);
     hmac.update(payload);

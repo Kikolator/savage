@@ -22,9 +22,6 @@ export interface RuntimeConfig {
     webhookSecret: string;
   };
   typeform: {
-    ids: {
-      trialDay: string;
-    };
     secretKey: string;
   };
   savage: {
@@ -58,9 +55,6 @@ export function getRuntimeConfig(): RuntimeConfig {
       webhookSecret: SECRETS.officeRndWebhookSecret.value(),
     },
     typeform: {
-      ids: {
-        trialDay: 'iqIU10kN',
-      },
       secretKey: SECRETS.typeformSecretKey.value(),
     },
     savage: {

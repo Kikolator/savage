@@ -21,4 +21,9 @@ export const STATIC_CONFIG = {
     googleReview: 'https://g.page/r/CWkHAQxtLGElEBM/review',
     website: 'https://savage-coworking.com',
   },
+  typeform: {
+    ids: {
+      trialDay: 'iqIU10kN',
+    },
+  },
 } as const;
