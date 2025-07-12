@@ -2,16 +2,20 @@ import {describe, it, expect, beforeEach, jest} from '@jest/globals';
 import {ScheduleFunction} from 'firebase-functions/v2/scheduler';
 
 import {scheduledEvents} from '../../src/scheduled-events';
+import {AddScheduledEvent} from '../../src/scheduled-events/initialize-scheduled-events';
 
 // Mock the scheduled events classes
 jest.mock(
   '../../src/scheduled-events/on-schedule-events/sendgrid-scheduled-events',
   () => ({
     SendgridScheduledEvents: jest.fn().mockImplementation(() => ({
-      initialize: jest.fn().mockImplementation((add: any) => {
+      initialize: jest.fn().mockImplementation((add: unknown) => {
         const mockHandler = (() =>
           Promise.resolve()) as unknown as ScheduleFunction;
-        add({name: 'updateSendgrid', handler: mockHandler});
+        (add as AddScheduledEvent)({
+          name: 'updateSendgrid',
+          handler: mockHandler,
+        });
       }),
     })),
   })
@@ -21,7 +25,7 @@ jest.mock(
   '../../src/scheduled-events/on-schedule-events/office-rnd-scheduled-events',
   () => ({
     OfficeRndScheduledEvents: jest.fn().mockImplementation(() => ({
-      initialize: jest.fn().mockImplementation((add: any) => {
+      initialize: jest.fn().mockImplementation((add: unknown) => {
         const mockHandler1 = (() =>
           Promise.resolve()) as unknown as ScheduleFunction;
         const mockHandler2 = (() =>
@@ -29,9 +33,15 @@ jest.mock(
         const mockHandler3 = (() =>
           Promise.resolve()) as unknown as ScheduleFunction;
 
-        add({name: 'tokenGeneration', handler: mockHandler1});
-        add({name: 'dataBackup', handler: mockHandler2});
-        add({name: 'trialdayFollowup', handler: mockHandler3});
+        (add as AddScheduledEvent)({
+          name: 'tokenGeneration',
+          handler: mockHandler1,
+        });
+        (add as AddScheduledEvent)({name: 'dataBackup', handler: mockHandler2});
+        (add as AddScheduledEvent)({
+          name: 'trialdayFollowup',
+          handler: mockHandler3,
+        });
       }),
     })),
   })

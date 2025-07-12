@@ -21,4 +21,8 @@ module.exports = {
   },
   testTimeout: 10000,
   verbose: true,
+  // Handle ES modules in node_modules
+  transformIgnorePatterns: [
+    'node_modules/(?!(firebase-functions|firebase-admin)/)',
+  ],
 };
