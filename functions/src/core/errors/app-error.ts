@@ -7,27 +7,6 @@ export enum ErrorCode {
   FORBIDDEN = 1004,
   INVALID_ARGUMENT = 1005,
 
-  // TrialDay Service errors (2000-2999)
-  TRIALDAY_MEMBER_NOT_ALLOWED = 2000,
-  TRIALDAY_ALREADY_COMPLETED = 2001,
-  TRIALDAY_PENDING_EXISTS = 2002,
-  TRIALDAY_NO_DESK_AVAILABLE = 2003,
-  TRIALDAY_BOOKING_ERROR = 2004,
-
-  // OfficeRnd Service errors (3000-3999)
-  OFFICERND_MEMBER_NOT_FOUND = 3000,
-  OFFICERND_DESK_BOOKING_FAILED = 3001,
-  OFFICE_RND_MULTIPLE_MEMBERS_FOUND = 3002,
-  TRIALDAY_STATUS_NOT_FOUND = 3003,
-  OFFICERND_UNKNOWN_EVENT = 3004,
-  OFFICERND_WEBHOOK_INVALID_SIGNATURE = 3005,
-
-  // Sendgrid Service errors (4000-4999)
-  SENDGRID_MAIL_SEND_FAILED = 4000,
-  SENDGRID_CONTACT_ADD_FAILED = 4001,
-  SENDGRID_LIST_NOT_FOUND = 4002,
-  SENDGRID_MULTIPLE_LISTS_FOUND = 4003,
-
   // Google Calendar Service errors (5000-5999)
   GOOGLECAL_EVENT_CREATION_FAILED = 5000,
 
@@ -37,48 +16,154 @@ export enum ErrorCode {
   TYPEFORM_WEBHOOK_NO_HANDLER_FOUND = 6002,
   TYPEFORM_WEBHOOK_NO_RAW_BODY = 6003,
 
-  // Firestore Service errors (7000-7999)
-  DOCUMENT_NOT_FOUND = 7000,
-  COLLECTION_EMPTY = 7001,
-
-  // Referral Service errors (8000-8999)
-  REFERRAL_CODE_ALREADY_EXISTS = 8000,
-  REFERRAL_CODE_NOT_FOUND = 8001,
-  REFERRAL_CODE_NO_PERMISSION = 8002,
-
   // Extended errors (9000-9999)
-  TRIALDAY_SERVICE_ERROR = 9009,
   EMAIL_CONFIRMATION_ERROR = 9010,
   TRIALDAY_EVENT_ERROR = 9011,
-  OFFICE_RND_SCHEDULED_EVENT_ERROR = 9012,
-  OFFICERND_CONTROLLER_ERROR = 9013,
 }
 
+/**
+ * Base error class for all application errors.
+ * Provides consistent error handling with proper error chaining and context.
+ */
 export class AppError extends Error {
   public readonly code: ErrorCode;
   public readonly status: number;
   public readonly details?: unknown;
+  public readonly timestamp: Date;
+  public readonly cause?: Error;
 
   constructor(
     message: string,
     code: ErrorCode = ErrorCode.UNKNOWN_ERROR,
     status = 500,
-    details?: unknown
+    details?: unknown,
+    cause?: Error
   ) {
+    // Ensure proper error inheritance
     super(message);
-    this.name = 'AppError';
+
+    // Set the name for proper instanceof checks
+    this.name = this.constructor.name;
+
+    // Set properties
     this.code = code;
     this.status = status;
     this.details = details;
+    this.timestamp = new Date();
+    this.cause = cause;
+
+    // Ensure proper stack trace
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, this.constructor);
+    }
   }
 
-  public toJSON() {
+  /**
+   * Creates a JSON representation of the error for logging/API responses.
+   * @returns Serialized error object
+   */
+  public toJSON(): Record<string, unknown> {
     return {
       name: this.name,
       message: this.message,
       code: this.code,
       status: this.status,
       details: this.details,
+      timestamp: this.timestamp.toISOString(),
+      stack: this.stack,
+      cause: this.cause
+        ? {
+            name: this.cause.name,
+            message: this.cause.message,
+            stack: this.cause.stack,
+          }
+        : undefined,
     };
+  }
+
+  /**
+   * Creates a simplified JSON representation for API responses.
+   * Excludes sensitive information like stack traces.
+   * @returns Safe error object for client consumption
+   */
+  public toSafeJSON(): Record<string, unknown> {
+    return {
+      name: this.name,
+      message: this.message,
+      code: this.code,
+      status: this.status,
+      details: this.details,
+      timestamp: this.timestamp.toISOString(),
+    };
+  }
+
+  /**
+   * Checks if this error is of a specific type.
+   * Useful for error handling and type guards.
+   * @param errorClass - The error class to check against
+   * @returns True if the error is an instance of the specified class
+   */
+  public isInstanceOf<T extends AppError>(
+    errorClass: new (...args: any[]) => T
+  ): this is T {
+    return this instanceof errorClass;
+  }
+
+  /**
+   * Creates a new error with additional context.
+   * Useful for adding context while preserving the original error.
+   * @param additionalDetails - Additional context to add
+   * @returns New error instance with combined details
+   */
+  public withDetails(additionalDetails: unknown): AppError {
+    const combinedDetails = {
+      ...((this.details as Record<string, unknown>) || {}),
+      ...((additionalDetails as Record<string, unknown>) || {}),
+    };
+
+    return new AppError(
+      this.message,
+      this.code,
+      this.status,
+      combinedDetails,
+      this
+    );
+  }
+
+  /**
+   * Creates a new error with a different message.
+   * Useful for providing more user-friendly error messages.
+   * @param newMessage - The new error message
+   * @returns New error instance with the updated message
+   */
+  public withMessage(newMessage: string): AppError {
+    return new AppError(newMessage, this.code, this.status, this.details, this);
+  }
+
+  /**
+   * Gets the full error chain as an array.
+   * Useful for debugging and logging.
+   * @returns Array of errors in the chain
+   */
+  public getErrorChain(): Error[] {
+    const chain: Error[] = [this];
+    let currentError: Error | undefined = this.cause;
+
+    while (currentError) {
+      chain.push(currentError);
+      currentError =
+        currentError instanceof AppError ? currentError.cause : undefined;
+    }
+
+    return chain;
+  }
+
+  /**
+   * Gets the root cause of the error chain.
+   * @returns The original error that started the chain
+   */
+  public getRootCause(): Error {
+    const chain = this.getErrorChain();
+    return chain[chain.length - 1];
   }
 }
