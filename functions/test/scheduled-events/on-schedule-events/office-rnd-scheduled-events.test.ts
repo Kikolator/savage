@@ -293,13 +293,17 @@ describe('OfficeRndScheduledEvents', () => {
           collection: 'errors',
           data: expect.objectContaining({
             name: 'OfficeRndScheduledEventError',
-            message: 'Failed to get and save OAuth2.0 token',
+            message: 'Failed to generate OAuth2.0 token',
             functionName: 'tokenGeneration',
+            localErrorCode: 11001,
+            code: 11001,
             details: expect.objectContaining({
-              data: expect.objectContaining({
-                originalError: 'Token generation failed',
-              }),
+              functionName: 'tokenGeneration',
+              localErrorCode: 11001,
+              originalError: 'Token generation failed',
+              scheduledEvent: true,
             }),
+            timestamp: expect.any(String),
           }),
         });
       });
@@ -332,9 +336,8 @@ describe('OfficeRndScheduledEvents', () => {
           collection: 'errors',
           data: expect.objectContaining({
             details: expect.objectContaining({
-              data: expect.objectContaining({
-                originalError: 'Unknown error',
-              }),
+              originalError: 'Unknown error',
+              localErrorCode: expect.any(Number),
             }),
           }),
         });

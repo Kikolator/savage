@@ -39,14 +39,14 @@ export class RewardScheduledEvents implements InitializeScheduledEvents {
           );
 
           // Create specific error for this scheduled event
-          const scheduledError = new RewardScheduledEventError(
-            'Failed to process due rewards',
-            'processDueRewards',
-            {
-              originalError:
-                error instanceof Error ? error.message : 'Unknown error',
-            }
-          );
+          const scheduledError =
+            RewardScheduledEventError.rewardProcessingFailed(
+              'processDueRewards',
+              {
+                originalError:
+                  error instanceof Error ? error.message : 'Unknown error',
+              }
+            );
 
           // Log to Firestore if not in development mode
           if (!isDevelopment()) {

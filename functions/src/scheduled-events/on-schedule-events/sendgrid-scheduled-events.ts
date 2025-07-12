@@ -289,30 +289,20 @@ export class SendgridScheduledEvents implements InitializeScheduledEvents {
         } catch (error) {
           const duration = startTime ? Date.now() - startTime : 0;
 
-          // Determine error context based on what was completed
-          let errorContext = 'Unknown error occurred';
+          // Determine error stage based on what was completed
           let errorStage = 'unknown';
 
           if (customFields.length > 0 && lists.length > 0) {
-            errorContext = 'Error occurred during Firestore batch operation';
             errorStage = 'firestore_batch';
           } else if (customFields.length > 0 && lists.length === 0) {
-            errorContext =
-              'Error occurred while fetching lists from SendGrid API';
             errorStage = 'lists_api';
           } else if (customFields.length === 0 && lists.length > 0) {
-            errorContext =
-              'Error occurred while fetching custom fields from SendGrid API';
             errorStage = 'custom_fields_api';
           } else if (customFields.length === 0 && lists.length === 0) {
             // Both failed - check if we got past the first API call
             if (error instanceof Error && error.message.includes('lists')) {
-              errorContext =
-                'Error occurred while fetching lists from SendGrid API';
               errorStage = 'lists_api';
             } else {
-              errorContext =
-                'Error occurred while fetching custom fields from SendGrid API';
               errorStage = 'custom_fields_api';
             }
           }
@@ -329,8 +319,7 @@ export class SendgridScheduledEvents implements InitializeScheduledEvents {
           );
 
           // Create specific error for this scheduled event
-          const scheduledError = new SendgridScheduledEventError(
-            errorContext,
+          const scheduledError = SendgridScheduledEventError.apiFetchFailed(
             'updateSendgrid',
             {
               originalError:

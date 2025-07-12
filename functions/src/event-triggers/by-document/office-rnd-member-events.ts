@@ -4,13 +4,13 @@ import {
 } from 'firebase-functions/v2/firestore';
 import {logger} from 'firebase-functions/v2';
 
-import {mainConfig} from '../../core/config/main-config';
+import {STATIC_CONFIG} from '../../core/config';
 import {
   AddEventTrigger,
   EventTriggerV2Function,
   InitializeEventTriggers,
 } from '../initialize-event-triggers';
-import {AppError, ErrorCode} from '../../core/errors/app-error';
+import {AppError, OfficeRndEventError} from '../../core/errors';
 import {OfficeRndMember} from '../../core/data/models';
 import {OfficeRndMemberStatus} from '../../core/data/enums';
 
@@ -25,7 +25,7 @@ export class OfficeRndMemberEvents implements InitializeEventTriggers {
     handler: onDocumentCreated(
       {
         document: 'officeRndMembers/{memberId}',
-        region: mainConfig.cloudFunctionsLocation,
+        region: STATIC_CONFIG.region,
       },
       async (event) => {
         try {
@@ -57,18 +57,23 @@ export class OfficeRndMemberEvents implements InitializeEventTriggers {
             // await this.whatsappService.addMemberToCommunity(member);
           }
         } catch (error) {
-          logger.error('Error in OfficeRnd member creation handler', {
-            memberId: event.params.memberId,
-            error: error instanceof Error ? error.message : 'unknown error',
-          });
+          logger.error(
+            'OfficeRndMemberEvents.onMemberCreated()- Error in member creation handler',
+            {
+              memberId: event.params.memberId,
+              error: error instanceof Error ? error.message : 'Unknown error',
+            }
+          );
 
           if (error instanceof AppError) {
             throw error;
           } else {
-            throw new AppError(
-              'Error in OfficeRnd member creation handler',
-              ErrorCode.UNKNOWN_ERROR,
-              500
+            throw OfficeRndEventError.memberCreationHandlerFailed(
+              event.params.memberId,
+              {
+                originalError:
+                  error instanceof Error ? error.message : 'Unknown error',
+              }
             );
           }
         }
@@ -81,7 +86,7 @@ export class OfficeRndMemberEvents implements InitializeEventTriggers {
     handler: onDocumentUpdated(
       {
         document: 'officeRndMembers/{memberId}',
-        region: mainConfig.cloudFunctionsLocation,
+        region: STATIC_CONFIG.region,
       },
       async (event) => {
         try {
@@ -142,18 +147,23 @@ export class OfficeRndMemberEvents implements InitializeEventTriggers {
             // await this.whatsappService.removeMemberFromCommunity(memberAfter);
           }
         } catch (error) {
-          logger.error('Error in OfficeRnd member status change handler', {
-            memberId: event.params.memberId,
-            error: error instanceof Error ? error.message : 'unknown error',
-          });
+          logger.error(
+            'OfficeRndMemberEvents.onMemberStatusChanged()- Error in member status change handler',
+            {
+              memberId: event.params.memberId,
+              error: error instanceof Error ? error.message : 'Unknown error',
+            }
+          );
 
           if (error instanceof AppError) {
             throw error;
           } else {
-            throw new AppError(
-              'Error in OfficeRnd member status change handler',
-              ErrorCode.UNKNOWN_ERROR,
-              500
+            throw OfficeRndEventError.memberStatusChangeHandlerFailed(
+              event.params.memberId,
+              {
+                originalError:
+                  error instanceof Error ? error.message : 'Unknown error',
+              }
             );
           }
         }

@@ -1,17 +1,12 @@
 import {onCall} from 'firebase-functions/v2/https';
 import {logger} from 'firebase-functions/v2';
 
-import {mainConfig} from '../../core/config/main-config';
-import {firebaseSecrets} from '../../core/config/firebase-secrets';
+import {STATIC_CONFIG, SECRET_REFERENCES} from '../../core/config';
 import {
   TrialdayMigrationService,
   MigrationOptions,
 } from '../../core/services/trialday-migration-service';
-import {TrialdayService} from '../../core/services/trialday-service';
-import {FirestoreService} from '../../core/services/firestore-service';
-import OfficeRndService from '../../core/services/office-rnd-service';
-import {SendgridService} from '../../core/services/sendgrid-service';
-import {EmailConfirmationService} from '../../core/services/email-confirmation-service';
+import {ServiceResolver} from '../../core/services/di';
 
 /**
  * Callable function for migrating legacy trialday data
@@ -19,8 +14,8 @@ import {EmailConfirmationService} from '../../core/services/email-confirmation-s
  */
 export const migrateTrialdayData = onCall(
   {
-    region: mainConfig.cloudFunctionsLocation,
-    secrets: [firebaseSecrets.sendgridApiKey],
+    region: STATIC_CONFIG.region,
+    secrets: [SECRET_REFERENCES.sendgridApiKey],
   },
   async (request) => {
     try {
@@ -32,18 +27,10 @@ export const migrateTrialdayData = onCall(
         hasTypeformData: !!typeformData,
       });
 
-      // Initialize services
-      const firestoreService = FirestoreService.getInstance();
-      const officeRndService = new OfficeRndService({firestoreService});
-      const trialdayService = new TrialdayService({
-        firestoreService,
-        sendgridService: SendgridService.getInstance(),
-        emailConfirmationService: new EmailConfirmationService({
-          firestoreService,
-          sendgridService: SendgridService.getInstance(),
-        }),
-        officeRndService,
-      });
+      // Get services from DI container
+      const trialdayService = ServiceResolver.getTrialdayService();
+      const firestoreService = ServiceResolver.getFirestoreService();
+      const officeRndService = ServiceResolver.getOfficeRndService();
 
       const migrationService = new TrialdayMigrationService(
         trialdayService,
@@ -119,11 +106,13 @@ export const migrateTrialdayData = onCall(
  */
 export const getMigrationStatus = onCall(
   {
-    region: mainConfig.cloudFunctionsLocation,
+    region: STATIC_CONFIG.region,
   },
   async () => {
     try {
-      const firestoreService = FirestoreService.getInstance();
+      // Get services from DI container
+      const firestoreService = ServiceResolver.getFirestoreService();
+      const officeRndService = ServiceResolver.getOfficeRndService();
 
       // Get statistics about missing trialdays
       const missingTrialdays = await firestoreService.queryCollection(
@@ -137,8 +126,7 @@ export const getMigrationStatus = onCall(
         []
       );
 
-      // Get total opportunities (you might need to implement this)
-      const officeRndService = new OfficeRndService({firestoreService});
+      // Get total opportunities
       const opportunities = await officeRndService.getOpportunities({});
 
       return {

@@ -19,9 +19,20 @@ for (const interceptor of interceptors) {
 const v1Router = httpServer.createdVersionedRouter('1');
 const v1HttpServer = new HttpServer(v1Router);
 
-// Initialize the controllers for v1
-getControllersV1().forEach((controller) => {
-  controller.initialize(v1HttpServer);
-});
+// Lazy initialization of controllers - will be called after container is initialized
+let controllersInitialized = false;
+
+const initializeControllers = () => {
+  if (!controllersInitialized) {
+    // Initialize the controllers for v1
+    getControllersV1().forEach((controller) => {
+      controller.initialize(v1HttpServer);
+    });
+    controllersInitialized = true;
+  }
+};
+
+// Export the initialization function
+export {initializeControllers};
 
 export default apiApp;

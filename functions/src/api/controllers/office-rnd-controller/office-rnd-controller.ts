@@ -2,29 +2,36 @@ import crypto from 'crypto';
 
 import {logger} from 'firebase-functions';
 import {RequestHandler} from 'express';
+import {DocumentData} from 'firebase-admin/firestore';
 
 import {Controller, HttpServer} from '..';
-import {firebaseSecrets} from '../../../core/config/firebase-secrets';
+import {getConfig} from '../../../core/config';
 import {OfficeRndControllerError} from '../../../core/errors';
 import OfficeRndService from '../../../core/services/office-rnd-service';
 import {FirestoreService} from '../../../core/services/firestore-service';
 import {SendgridService} from '../../../core/services/sendgrid-service';
-import { OfficeRndMember } from '../../../core/data/models';
+import {OfficeRndMember} from '../../../core/data/models';
 
 interface OfficeRndWebhookBody {
   eventType: string;
   data: {
-    object: Record<string, any>;
-    previousAttributes: Record<string, any>;
-  }
+    object: Record<string, unknown>;
+    previousAttributes: Record<string, unknown>;
+  };
 }
 
 class OfficeRndController implements Controller {
+  private readonly config: ReturnType<typeof getConfig>['runtime'];
+
   constructor(
     private readonly officeRndService: OfficeRndService,
     private readonly firestoreService: FirestoreService,
     private readonly sendgridService: SendgridService
-  ) {}
+  ) {
+    // Get runtime config when controller is instantiated
+    const appConfig = getConfig();
+    this.config = appConfig.runtime;
+  }
   initialize(httpServer: HttpServer): void {
     httpServer.post('/webhook/office-rnd', this.handleWebhook.bind(this));
     httpServer.get(
@@ -32,7 +39,10 @@ class OfficeRndController implements Controller {
       this.initializeOfficeRnd.bind(this)
     );
     httpServer.get('/backup-status', this.getBackupStatus.bind(this));
-    httpServer.post('/cleanup-faulty-webhooks', this.cleanupFaultyWebhooks.bind(this));
+    httpServer.post(
+      '/cleanup-faulty-webhooks',
+      this.cleanupFaultyWebhooks.bind(this)
+    );
   }
 
   private handleWebhook: RequestHandler = async (request, response, next) => {
@@ -80,19 +90,25 @@ class OfficeRndController implements Controller {
         logger.info('OfficeRndController.handleWebhook: member created', {
           data,
         });
-        await this.handleMemberCreated(data.object as OfficeRndMember);
+        await this.handleMemberCreated(
+          data.object as unknown as OfficeRndMember
+        );
         break;
       case 'member.updated':
         logger.info('OfficeRndController.handleWebhook: member updated', {
           data,
         });
-        await this.handleMemberUpdated(data.object as OfficeRndMember);
+        await this.handleMemberUpdated(
+          data.object as unknown as OfficeRndMember
+        );
         break;
       case 'member.removed':
         logger.info('OfficeRndController.handleWebhook: member removed', {
           data,
         });
-        await this.handleMemberRemoved(data.object as OfficeRndMember);
+        await this.handleMemberRemoved(
+          data.object as unknown as OfficeRndMember
+        );
         break;
       default:
         logger.warn(
@@ -114,7 +130,7 @@ class OfficeRndController implements Controller {
       );
     }
 
-    const webhookSecret = firebaseSecrets.officeRndWebhookSecret.value();
+    const webhookSecret = this.config.officeRnd.webhookSecret;
 
     const signatureHeaderParts = officeRndSignature.split(',');
     const timestampParts = signatureHeaderParts[0].split('=');
@@ -232,13 +248,19 @@ class OfficeRndController implements Controller {
    * Cleanup faulty webhook documents that were created with OfficeRndWebhookBody.data structure
    * instead of OfficeRndMember structure
    */
-  public cleanupFaultyWebhooks: RequestHandler = async (request, response, next) => {
+  public cleanupFaultyWebhooks: RequestHandler = async (
+    request,
+    response,
+    next
+  ) => {
     try {
-      logger.info('OfficeRndController.cleanupFaultyWebhooks: Starting cleanup of faulty webhook documents');
+      logger.info(
+        'OfficeRndController.cleanupFaultyWebhooks: Starting cleanup of faulty webhook documents'
+      );
 
       // Verify caller by checking the secret
       const secret = request.headers['savage-secret'];
-      if (secret !== firebaseSecrets.savageSecret.value()) {
+      if (secret !== this.config.savage.secret) {
         throw new OfficeRndControllerError(
           'Invalid secret for cleanupFaultyWebhooks. This endpoint is only accessible to Savage.',
           401,
@@ -251,19 +273,19 @@ class OfficeRndController implements Controller {
         OfficeRndService.membersCollection
       );
 
-      const faultyDocuments: Array<{id: string; data: any}> = [];
-      const validDocuments: Array<{id: string; data: any}> = [];
+      const faultyDocuments: Array<{id: string; data: DocumentData}> = [];
+      const validDocuments: Array<{id: string; data: DocumentData}> = [];
 
       query.forEach((documentData, documentId) => {
-        const data = documentData as any;
-        
+        const data = documentData as DocumentData;
+
         // Check if this is a faulty document (has the webhook body structure)
         // Faulty documents will have: { object: {...}, previousAttributes: {...} }
         // Valid documents will have: { _id: string, ... }
         if (data.data.object && data.data.previousAttributes) {
-          faultyDocuments.push({ id: String(documentId), data });
+          faultyDocuments.push({id: String(documentId), data});
         } else if (data._id) {
-          validDocuments.push({ id: String(documentId), data });
+          validDocuments.push({id: String(documentId), data});
         } else {
           // Unknown structure, log for investigation
           logger.warn('Unknown document structure found', {
@@ -283,11 +305,10 @@ class OfficeRndController implements Controller {
       if (faultyDocuments.length > 0) {
         await this.firestoreService.runBatch(async (batch) => {
           for (const faultyDoc of faultyDocuments) {
-            batch.delete(
-              this.firestoreService
-                .getFirestoreInstance()
-                .collection(OfficeRndService.membersCollection)
-                .doc(faultyDoc.id)
+            this.firestoreService.addDeleteToBatch(
+              batch,
+              OfficeRndService.membersCollection,
+              faultyDoc.id
             );
           }
         });
@@ -301,7 +322,7 @@ class OfficeRndController implements Controller {
         totalDocuments: faultyDocuments.length + validDocuments.length,
         faultyDocumentsDeleted: faultyDocuments.length,
         validDocumentsRemaining: validDocuments.length,
-        faultyDocumentIds: faultyDocuments.map(doc => doc.id),
+        faultyDocumentIds: faultyDocuments.map((doc) => doc.id),
         message: `Successfully deleted ${faultyDocuments.length} faulty webhook documents`,
       };
 
@@ -402,7 +423,7 @@ class OfficeRndController implements Controller {
     );
     // Verify caller by checking the secret.
     const secret = request.headers['savage-secret'];
-    if (secret !== firebaseSecrets.savageSecret.value()) {
+    if (secret !== this.config.savage.secret) {
       throw new OfficeRndControllerError(
         'Invalid secret for initializeOfficeRnd. This endpoint is only accessible to Savage.',
         401,
@@ -444,22 +465,20 @@ class OfficeRndController implements Controller {
     await this.firestoreService.runBatch(async (batch) => {
       for (const member of members) {
         if (member._id) {
-          batch.set(
-            this.firestoreService
-              .getFirestoreInstance()
-              .collection(OfficeRndService.membersCollection)
-              .doc(member._id),
+          this.firestoreService.addSetToBatch(
+            batch,
+            OfficeRndService.membersCollection,
+            member._id,
             member
           );
         }
       }
       for (const company of companies) {
         if (company._id) {
-          batch.set(
-            this.firestoreService
-              .getFirestoreInstance()
-              .collection(OfficeRndService.companiesCollection)
-              .doc(company._id),
+          this.firestoreService.addSetToBatch(
+            batch,
+            OfficeRndService.companiesCollection,
+            company._id,
             company
           );
         }
@@ -469,21 +488,19 @@ class OfficeRndController implements Controller {
           // Skip if opportunity has no id. Which should not happen but just in case.
           continue;
         }
-        batch.set(
-          this.firestoreService
-            .getFirestoreInstance()
-            .collection(OfficeRndService.opportunitiesCollection)
-            .doc(opportunity._id),
+        this.firestoreService.addSetToBatch(
+          batch,
+          OfficeRndService.opportunitiesCollection,
+          opportunity._id,
           opportunity
         );
       }
       for (const opStatus of opStatuses) {
         if (opStatus._id) {
-          batch.set(
-            this.firestoreService
-              .getFirestoreInstance()
-              .collection(OfficeRndService.opportunityStatusesCollection)
-              .doc(opStatus._id),
+          this.firestoreService.addSetToBatch(
+            batch,
+            OfficeRndService.opportunityStatusesCollection,
+            opStatus._id,
             opStatus
           );
         }

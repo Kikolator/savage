@@ -47,14 +47,14 @@ export class OfficeRndScheduledEvents implements InitializeScheduledEvents {
           );
 
           // Create specific error for this scheduled event
-          const scheduledError = new OfficeRndScheduledEventError(
-            'Failed to get and save OAuth2.0 token',
-            'tokenGeneration',
-            {
-              originalError:
-                error instanceof Error ? error.message : 'Unknown error',
-            }
-          );
+          const scheduledError =
+            OfficeRndScheduledEventError.tokenGenerationFailed(
+              'tokenGeneration',
+              {
+                originalError:
+                  error instanceof Error ? error.message : 'Unknown error',
+              }
+            );
 
           // Log to Firestore if not in development mode
           if (!isDevelopment()) {
@@ -200,8 +200,7 @@ export class OfficeRndScheduledEvents implements InitializeScheduledEvents {
           );
 
           // Create specific error for this scheduled event
-          const scheduledError = new OfficeRndScheduledEventError(
-            'Failed to perform data backup and validation',
+          const scheduledError = OfficeRndScheduledEventError.dataBackupFailed(
             'dataBackup',
             {
               originalError:
@@ -345,14 +344,14 @@ export class OfficeRndScheduledEvents implements InitializeScheduledEvents {
           );
 
           // Create specific error for this scheduled event
-          const scheduledError = new OfficeRndScheduledEventError(
-            'Failed to process trial complete opportunities',
-            'trialdayFollowup',
-            {
-              originalError:
-                error instanceof Error ? error.message : 'Unknown error',
-            }
-          );
+          const scheduledError =
+            OfficeRndScheduledEventError.trialdayFollowupFailed(
+              'trialdayFollowup',
+              {
+                originalError:
+                  error instanceof Error ? error.message : 'Unknown error',
+              }
+            );
 
           // Log error to Firestore if not in development
           if (!isDevelopment()) {

@@ -6,6 +6,6 @@ export * from './services/office-rnd-service-error';
 export * from './services/referral-service-error';
 export * from './services/reward-service-error';
 export * from './services/sendgrid-service-error';
-export * from './event-triggers/trialday-event-error';
-export * from './scheduled-events/office-rnd-scheduled-error';
+export * from './event-triggers';
+export * from './scheduled-events';
 export * from './api/office-rnd-controller-error';

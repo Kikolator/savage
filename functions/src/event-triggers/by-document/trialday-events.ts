@@ -1,7 +1,7 @@
 import {onDocumentUpdated} from 'firebase-functions/v2/firestore';
 import {logger} from 'firebase-functions/v2';
 
-import {mainConfig} from '../../core/config/main-config';
+import {STATIC_CONFIG, SECRET_REFERENCES} from '../../core/config';
 import {
   AddEventTrigger,
   EventTriggerV2Function,
@@ -14,7 +14,6 @@ import {Trialday} from '../../core/data/models';
 import {TrialdayStatus} from '../../core/data/enums';
 import {ReferralService} from '../../core/services/referral-service';
 import OfficeRndService from '../../core/services/office-rnd-service';
-import {firebaseSecrets} from '../../core/config/firebase-secrets';
 
 export class TrialdayEvents implements InitializeEventTriggers {
   constructor(
@@ -31,8 +30,8 @@ export class TrialdayEvents implements InitializeEventTriggers {
     handler: onDocumentUpdated(
       {
         document: `${TrialdayService.trialDaysCollection}/{trialdayId}`,
-        region: mainConfig.cloudFunctionsLocation,
-        secrets: [firebaseSecrets.sendgridApiKey],
+        region: STATIC_CONFIG.region,
+        secrets: [SECRET_REFERENCES.sendgridApiKey],
       },
       async (event) => {
         try {
@@ -116,13 +115,9 @@ export class TrialdayEvents implements InitializeEventTriggers {
           if (error instanceof AppError) {
             throw error;
           } else {
-            throw new TrialdayEventError(
-              'Error on trial day firestore event function.',
-              'onTrialdayChanged',
-              {
-                error: error instanceof Error ? error.toString() : 'unknown',
-              }
-            );
+            throw TrialdayEventError.eventHandlerFailed('onTrialdayChanged', {
+              error: error instanceof Error ? error.toString() : 'unknown',
+            });
           }
         }
       }

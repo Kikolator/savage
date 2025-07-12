@@ -2,6 +2,18 @@ import {DocumentData} from 'firebase-admin/firestore';
 
 import {ReferrerType} from '../../enums';
 
+interface ReferralCodeData {
+  documentId: string;
+  code: string;
+  ownerId: string;
+  companyId: string | null;
+  ownerType: ReferrerType;
+  totalReferred: number;
+  totalConverted: number;
+  totalRewardedEur: number;
+  referredUsers: string[];
+}
+
 export class ReferralCode {
   documentId: string; // same as ownerId (officeRnd)
   code: string;
@@ -17,17 +29,7 @@ export class ReferralCode {
   // List with users that have been referred with this code.
   referredUsers: string[];
 
-  constructor(params: {
-    documentId: string;
-    code: string;
-    ownerId: string;
-    companyId: string | null;
-    ownerType: ReferrerType;
-    totalReferred: number;
-    totalConverted: number;
-    totalRewardedEur: number;
-    referredUsers: string[];
-  }) {
+  constructor(params: ReferralCodeData) {
     this.documentId = params.documentId;
     this.code = params.code;
     this.ownerId = params.ownerId;

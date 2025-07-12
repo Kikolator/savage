@@ -6,7 +6,7 @@ import {
   CallableV2Function,
   InitializeCallableFunctions,
 } from '../initialize-callable-functions';
-import {mainConfig} from '../../core/config/main-config';
+import {STATIC_CONFIG} from '../../core/config';
 import {CreateReferralCodeCallData} from '../../core/data/models/referral-code/create-referral-code-call-data';
 import {ServiceResolver} from '../../core/services/di';
 import {ReferrerType} from '../../core/data/enums';
@@ -21,7 +21,7 @@ export class ReferralFunctions implements InitializeCallableFunctions {
     name: 'createReferralCode',
     handler: onCall(
       {
-        region: mainConfig.cloudFunctionsLocation,
+        region: STATIC_CONFIG.region,
         // TODO update cors settings for production.
         cors: [
           'http://localhost:*',

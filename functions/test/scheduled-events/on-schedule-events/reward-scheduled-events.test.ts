@@ -245,6 +245,7 @@ describe('RewardScheduledEvents', () => {
           expect((error as RewardScheduledEventError).details).toEqual({
             functionName: 'processDueRewards',
             scheduledEvent: true,
+            localErrorCode: 10001,
             originalError: 'Test error message',
           });
         }
@@ -261,6 +262,7 @@ describe('RewardScheduledEvents', () => {
           expect((error as RewardScheduledEventError).details).toEqual({
             functionName: 'processDueRewards',
             scheduledEvent: true,
+            localErrorCode: 10001,
             originalError: 'Complex error with details',
           });
         }
