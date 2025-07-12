@@ -1,21 +1,19 @@
-import {onSchedule} from 'firebase-functions/scheduler';
-import {logger} from 'firebase-functions';
+import {onSchedule} from 'firebase-functions/v2/scheduler';
+import {logger} from 'firebase-functions/v2';
 
-import {
-  AddScheduledEvent,
-  InitializeScheduledEvents,
-  ScheduledV2Function,
-} from '../initialize-scheduled-events';
-import {mainConfig} from '../../core/config/main-config';
-import {firebaseSecrets} from '../../core/config/firebase-secrets';
-import {FirestoreService} from '../../core/services/firestore-service';
+import {STATIC_CONFIG, SECRET_REFERENCES, getConfig} from '../../core/config';
+import {FirestoreService} from '../../core/services';
+import OfficeRndService from '../../core/services/office-rnd-service';
+import {ServiceResolver} from '../../core/services/di';
 import {isDevelopment} from '../../core/utils/environment';
 import {OfficeRndOpportunity} from '../../core/data/models';
+import {
+  InitializeScheduledEvents,
+  AddScheduledEvent,
+  ScheduledV2Function,
+} from '../initialize-scheduled-events';
 import {TrialdayStatus} from '../../core/data/enums';
-import {TrialdayService} from '../../core/services/trialday-service';
-import {SendgridService} from '../../core/services/sendgrid-service';
-import {EmailConfirmationService} from '../../core/services/email-confirmation-service';
-import OfficeRndService from '../../core/services/office-rnd-service';
+import {OfficeRndScheduledEventError} from '../../core/errors';
 
 export class OfficeRndScheduledEvents implements InitializeScheduledEvents {
   initialize(add: AddScheduledEvent): void {
@@ -28,45 +26,66 @@ export class OfficeRndScheduledEvents implements InitializeScheduledEvents {
     name: 'tokenGeneration',
     handler: onSchedule(
       {
-        region: mainConfig.cloudFunctionsLocation,
-        secrets: [firebaseSecrets.officeRndSecretKey],
+        region: STATIC_CONFIG.region,
+        secrets: [SECRET_REFERENCES.officeRndSecretKey],
         schedule: 'every 45 minutes',
+        timeZone: STATIC_CONFIG.timezone,
       },
       async () => {
         try {
           logger.info(
             'OfficeRndScheduledEvents.tokenGeneration()- Getting and saving OAuth2.0 token'
           );
-          const officeRndService = new OfficeRndService({
-            firestoreService: FirestoreService.getInstance(),
-          });
+          const officeRndService = ServiceResolver.getOfficeRndService();
           await officeRndService._getAndSaveToken(
-            firebaseSecrets.officeRndSecretKey.value()
+            (await getConfig()).runtime.officeRnd.secretKey
           );
         } catch (error) {
           logger.error(
             'OfficeRndScheduledEvents.tokenGeneration()- Error getting and saving token',
             error
           );
-          // add error to firestore if not in debug mode
+
+          // Create specific error for this scheduled event
+          const scheduledError = new OfficeRndScheduledEventError(
+            'Failed to get and save OAuth2.0 token',
+            'tokenGeneration',
+            {
+              originalError:
+                error instanceof Error ? error.message : 'Unknown error',
+            }
+          );
+
+          // Log to Firestore if not in development mode
           if (!isDevelopment()) {
-            if (error instanceof Error) {
+            try {
               const firestoreService = FirestoreService.getInstance();
               await firestoreService.createDocument({
                 collection: 'errors',
-                data: {
-                  name: 'OfficeRndScheduledEvents.tokenGeneration',
-                  error: error.message,
-                  timestamp: new Date(),
-                },
+                data: scheduledError.toFirestoreError(),
               });
-              return;
+            } catch (loggingError) {
+              logger.error(
+                'OfficeRndScheduledEvents.tokenGeneration()- Failed to log error to Firestore',
+                {
+                  originalError:
+                    error instanceof Error ? error.message : 'Unknown error',
+                  loggingError:
+                    loggingError instanceof Error
+                      ? loggingError.message
+                      : 'Unknown error',
+                }
+              );
+              // Don't let logging errors break the main error flow
             }
           } else {
             logger.debug(
               'OfficeRndScheduledEvents.tokenGeneration()- In development mode, the error will not be logged in Firestore'
             );
           }
+
+          // Re-throw the specific error for proper error handling
+          throw scheduledError;
         }
       }
     ),
@@ -76,10 +95,10 @@ export class OfficeRndScheduledEvents implements InitializeScheduledEvents {
     name: 'dataBackup',
     handler: onSchedule(
       {
-        region: mainConfig.cloudFunctionsLocation,
-        secrets: [firebaseSecrets.officeRndSecretKey],
+        region: STATIC_CONFIG.region,
+        secrets: [SECRET_REFERENCES.officeRndSecretKey],
         schedule: 'every 24 hours',
-        timeZone: 'UTC',
+        timeZone: STATIC_CONFIG.timezone,
       },
       async () => {
         try {
@@ -87,9 +106,7 @@ export class OfficeRndScheduledEvents implements InitializeScheduledEvents {
             'OfficeRndScheduledEvents.dataBackup()- Starting daily data backup and validation'
           );
 
-          const officeRndService = new OfficeRndService({
-            firestoreService: FirestoreService.getInstance(),
-          });
+          const officeRndService = ServiceResolver.getOfficeRndService();
 
           // Get data from both sources for comparison
           const [firestoreMembers, apiMembers] = await Promise.all([
@@ -182,27 +199,64 @@ export class OfficeRndScheduledEvents implements InitializeScheduledEvents {
             error
           );
 
+          // Create specific error for this scheduled event
+          const scheduledError = new OfficeRndScheduledEventError(
+            'Failed to perform data backup and validation',
+            'dataBackup',
+            {
+              originalError:
+                error instanceof Error ? error.message : 'Unknown error',
+            }
+          );
+
           // Log error to Firestore if not in development
           if (!isDevelopment()) {
-            if (error instanceof Error) {
+            try {
               const firestoreService = FirestoreService.getInstance();
               await firestoreService.createDocument({
                 collection: 'errors',
-                data: {
-                  name: 'OfficeRndScheduledEvents.dataBackup',
-                  error: error.message,
-                  timestamp: new Date(),
-                },
+                data: scheduledError.toFirestoreError(),
               });
+            } catch (loggingError) {
+              logger.error(
+                'OfficeRndScheduledEvents.dataBackup()- Failed to log error to Firestore',
+                {
+                  originalError:
+                    error instanceof Error ? error.message : 'Unknown error',
+                  loggingError:
+                    loggingError instanceof Error
+                      ? loggingError.message
+                      : 'Unknown error',
+                }
+              );
+              // Don't let logging errors break the main error flow
             }
           }
 
           // Update backup metadata with error
-          await this.updateBackupMetadata({
-            lastBackup: new Date(),
-            status: 'failed',
-            error: error instanceof Error ? error.message : 'unknown error',
-          });
+          try {
+            await this.updateBackupMetadata({
+              lastBackup: new Date(),
+              status: 'failed',
+              error: error instanceof Error ? error.message : 'unknown error',
+            });
+          } catch (metadataError) {
+            logger.error(
+              'OfficeRndScheduledEvents.dataBackup()- Failed to update backup metadata',
+              {
+                originalError:
+                  error instanceof Error ? error.message : 'Unknown error',
+                metadataError:
+                  metadataError instanceof Error
+                    ? metadataError.message
+                    : 'Unknown error',
+              }
+            );
+            // Don't let metadata errors break the main error flow
+          }
+
+          // Re-throw the specific error for proper error handling
+          throw scheduledError;
         }
       }
     ),
@@ -212,10 +266,10 @@ export class OfficeRndScheduledEvents implements InitializeScheduledEvents {
     name: 'trialdayFollowup',
     handler: onSchedule(
       {
-        region: mainConfig.cloudFunctionsLocation,
-        secrets: [firebaseSecrets.sendgridApiKey],
+        region: STATIC_CONFIG.region,
+        secrets: [SECRET_REFERENCES.sendgridApiKey],
         schedule: 'every 6 hours',
-        timeZone: 'UTC',
+        timeZone: STATIC_CONFIG.timezone,
       },
       async () => {
         try {
@@ -223,10 +277,7 @@ export class OfficeRndScheduledEvents implements InitializeScheduledEvents {
             'OfficeRndScheduledEvents.trialdayFollowup()- Starting trial complete opportunity check'
           );
 
-          const firestoreService = FirestoreService.getInstance();
-          const officeRndService = new OfficeRndService({
-            firestoreService,
-          });
+          const officeRndService = ServiceResolver.getOfficeRndService();
 
           // Get all opportunity statuses to find the trialComplete status
           const opportunityStatuses =
@@ -293,20 +344,42 @@ export class OfficeRndScheduledEvents implements InitializeScheduledEvents {
             error
           );
 
+          // Create specific error for this scheduled event
+          const scheduledError = new OfficeRndScheduledEventError(
+            'Failed to process trial complete opportunities',
+            'trialdayFollowup',
+            {
+              originalError:
+                error instanceof Error ? error.message : 'Unknown error',
+            }
+          );
+
           // Log error to Firestore if not in development
           if (!isDevelopment()) {
-            if (error instanceof Error) {
+            try {
               const firestoreService = FirestoreService.getInstance();
               await firestoreService.createDocument({
                 collection: 'errors',
-                data: {
-                  name: 'OfficeRndScheduledEvents.trialdayFollowup',
-                  error: error.message,
-                  timestamp: new Date(),
-                },
+                data: scheduledError.toFirestoreError(),
               });
+            } catch (loggingError) {
+              logger.error(
+                'OfficeRndScheduledEvents.trialdayFollowup()- Failed to log error to Firestore',
+                {
+                  originalError:
+                    error instanceof Error ? error.message : 'Unknown error',
+                  loggingError:
+                    loggingError instanceof Error
+                      ? loggingError.message
+                      : 'Unknown error',
+                }
+              );
+              // Don't let logging errors break the main error flow
             }
           }
+
+          // Re-throw the specific error for proper error handling
+          throw scheduledError;
         }
       }
     ),
@@ -331,69 +404,73 @@ export class OfficeRndScheduledEvents implements InitializeScheduledEvents {
       'OfficeRndScheduledEvents.performFullSync()- Starting full sync'
     );
 
-    // Use the existing initialization method to perform full sync
-    // This will be implemented in the OfficeRndController
-    const firestoreService = FirestoreService.getInstance();
+    try {
+      // Get services from DI container
+      const firestoreService = ServiceResolver.getFirestoreService();
 
-    // For now, we'll call the API methods directly and update Firestore
-    // In the future, this could be moved to a dedicated sync service
-
-    const [members, companies, opportunities] = await Promise.all([
-      officeRndService.getAllMembersFromAPI(),
-      officeRndService.getAllCompaniesFromAPI(),
-      officeRndService.getOpportunitiesFromAPI({}),
-    ]);
-
-    // Update Firestore with latest data
-    await firestoreService.runBatch(async (batch) => {
-      // Update members
+      // Initialize members sync
+      logger.info(
+        'OfficeRndScheduledEvents.performFullSync()- Syncing members'
+      );
+      const members = await officeRndService.getAllMembersFromAPI();
       for (const member of members) {
-        if (member._id) {
-          batch.set(
-            firestoreService
-              .getFirestoreInstance()
-              .collection(OfficeRndService.membersCollection)
-              .doc(member._id),
-            member
-          );
-        }
+        await firestoreService.setDocument({
+          collection: OfficeRndService.membersCollection,
+          documentId: member._id,
+          data: member,
+        });
       }
 
-      // Update companies
-      for (const company of companies) {
-        if (company._id) {
-          batch.set(
-            firestoreService
-              .getFirestoreInstance()
-              .collection(OfficeRndService.companiesCollection)
-              .doc(company._id),
-            company
-          );
-        }
-      }
-
-      // Update opportunities
+      // Initialize opportunities sync
+      logger.info(
+        'OfficeRndScheduledEvents.performFullSync()- Syncing opportunities'
+      );
+      const opportunities = await officeRndService.getOpportunitiesFromAPI({});
       for (const opportunity of opportunities) {
-        if (opportunity._id) {
-          batch.set(
-            firestoreService
-              .getFirestoreInstance()
-              .collection(OfficeRndService.opportunitiesCollection)
-              .doc(opportunity._id),
-            opportunity
-          );
-        }
+        await firestoreService.setDocument({
+          collection: OfficeRndService.opportunitiesCollection,
+          documentId: opportunity._id,
+          data: opportunity,
+        });
       }
-    });
 
-    logger.info(
-      'OfficeRndScheduledEvents.performFullSync()- Full sync completed',
-      {
-        membersUpdated: members.length,
-        companiesUpdated: companies.length,
-        opportunitiesUpdated: opportunities.length,
+      // Initialize companies sync
+      logger.info(
+        'OfficeRndScheduledEvents.performFullSync()- Syncing companies'
+      );
+      const companies = await officeRndService.getAllCompaniesFromAPI();
+      for (const company of companies) {
+        await firestoreService.setDocument({
+          collection: OfficeRndService.companiesCollection,
+          documentId: company._id,
+          data: company,
+        });
       }
-    );
+
+      // Initialize opportunity statuses sync
+      logger.info(
+        'OfficeRndScheduledEvents.performFullSync()- Syncing opportunity statuses'
+      );
+      const opportunityStatuses =
+        await officeRndService.getOpportunityStatusesFromAPI();
+      for (const status of opportunityStatuses) {
+        await firestoreService.setDocument({
+          collection: OfficeRndService.opportunityStatusesCollection,
+          documentId: status._id,
+          data: status,
+        });
+      }
+
+      logger.info(
+        'OfficeRndScheduledEvents.performFullSync()- Full sync completed successfully'
+      );
+    } catch (error) {
+      logger.error(
+        'OfficeRndScheduledEvents.performFullSync()- Error during full sync',
+        error
+      );
+      throw error;
+    }
   }
 
   private async processTrialComplete(
@@ -408,17 +485,8 @@ export class OfficeRndScheduledEvents implements InitializeScheduledEvents {
       }
     );
 
-    const trialdayService = new TrialdayService({
-      firestoreService: FirestoreService.getInstance(),
-      sendgridService: SendgridService.getInstance(),
-      emailConfirmationService: new EmailConfirmationService({
-        firestoreService: FirestoreService.getInstance(),
-        sendgridService: SendgridService.getInstance(),
-      }),
-      officeRndService: new OfficeRndService({
-        firestoreService: FirestoreService.getInstance(),
-      }),
-    });
+    // Get services from DI container
+    const trialdayService = ServiceResolver.getTrialdayService();
 
     // Validate opportunity has required fields
     if (!opportunity._id) {
@@ -502,6 +570,8 @@ export class OfficeRndScheduledEvents implements InitializeScheduledEvents {
             error: error instanceof Error ? error.message : 'unknown',
           }
         );
+        // Note: We don't throw here because this is a logging operation
+        // and we don't want it to break the main processing flow
       }
     }
   }
@@ -514,15 +584,27 @@ export class OfficeRndScheduledEvents implements InitializeScheduledEvents {
     status: 'completed' | 'failed';
     error?: string;
   }): Promise<void> {
-    const firestoreService = FirestoreService.getInstance();
-    await firestoreService.setDocument({
-      collection: OfficeRndService.metadataCollection,
-      documentId: 'backup-metadata',
-      merge: true,
-      data: {
-        ...metadata,
-        updatedAt: new Date(),
-      },
-    });
+    try {
+      const firestoreService = FirestoreService.getInstance();
+      await firestoreService.setDocument({
+        collection: OfficeRndService.metadataCollection,
+        documentId: 'backup-metadata',
+        merge: true,
+        data: {
+          ...metadata,
+          updatedAt: new Date(),
+        },
+      });
+    } catch (error) {
+      logger.error(
+        'OfficeRndScheduledEvents.updateBackupMetadata()- Failed to update backup metadata',
+        {
+          metadata,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        }
+      );
+      // Note: We don't throw here because this is a metadata update operation
+      // and we don't want it to break the main processing flow
+    }
   }
 }
