@@ -120,23 +120,27 @@ export const container = new DIContainer();
 export function initializeContainer(): void {
   logger.info('Initializing DI container');
 
-  // Register shared services as singletons
+  // Register core infrastructure services as lazy singletons
   container.registerSingletonFactory('firestore', () =>
     FirestoreService.getInstance()
   );
   container.registerSingletonFactory('sendgrid', () =>
-    SendgridService.getInstance()
+    SendgridService.getInstance({
+      firestoreService: container.resolve('firestore'),
+    })
   );
 
-  // Register business services
-  container.register(
-    'officeRnd',
-    () =>
-      new OfficeRndService({
-        firestoreService: container.resolve('firestore'),
-      })
+  // Register external API services as lazy singletons
+  container.registerSingletonFactory('officeRnd', () =>
+    OfficeRndService.getInstance({
+      firestoreService: container.resolve('firestore'),
+    })
+  );
+  container.registerSingletonFactory('bankPayout', () =>
+    BankPayoutService.getInstance()
   );
 
+  // Register business logic services as factories
   container.register(
     'emailConfirmation',
     () =>
@@ -145,8 +149,6 @@ export function initializeContainer(): void {
         sendgridService: container.resolve('sendgrid'),
       })
   );
-
-  container.register('bankPayout', () => new BankPayoutService());
 
   container.register(
     'reward',
@@ -168,15 +170,13 @@ export function initializeContainer(): void {
       })
   );
 
-  container.register(
-    'trialday',
-    () =>
-      new TrialdayService({
-        firestoreService: container.resolve('firestore'),
-        sendgridService: container.resolve('sendgrid'),
-        emailConfirmationService: container.resolve('emailConfirmation'),
-        officeRndService: container.resolve('officeRnd'),
-      })
+  container.registerSingletonFactory('trialday', () =>
+    TrialdayService.getInstance({
+      firestoreService: container.resolve('firestore'),
+      sendgridService: container.resolve('sendgrid'),
+      emailConfirmationService: container.resolve('emailConfirmation'),
+      officeRndService: container.resolve('officeRnd'),
+    })
   );
 
   container.register(

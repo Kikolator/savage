@@ -2,21 +2,22 @@ import {AppError, ErrorCode} from '../app-error';
 
 /**
  * FirestoreService-specific error codes.
- * These are defined in the main ErrorCode enum in the 7000-7999 range.
+ * These are defined in the 7000-7999 range.
  */
-export const FirestoreErrorCode = {
-  DOCUMENT_NOT_FOUND: ErrorCode.DOCUMENT_NOT_FOUND,
-  COLLECTION_EMPTY: ErrorCode.COLLECTION_EMPTY,
-  BATCH_OPERATION_FAILED: ErrorCode.BATCH_OPERATION_FAILED,
-  TRANSACTION_FAILED: ErrorCode.TRANSACTION_FAILED,
-  QUERY_FAILED: ErrorCode.QUERY_FAILED,
-  DOCUMENT_CREATION_FAILED: ErrorCode.DOCUMENT_CREATION_FAILED,
-  DOCUMENT_UPDATE_FAILED: ErrorCode.DOCUMENT_UPDATE_FAILED,
-  DOCUMENT_DELETION_FAILED: ErrorCode.DOCUMENT_DELETION_FAILED,
-  INVALID_DOCUMENT_DATA: ErrorCode.INVALID_DOCUMENT_DATA,
-  CONNECTION_ERROR: ErrorCode.CONNECTION_ERROR,
-  PERMISSION_DENIED: ErrorCode.PERMISSION_DENIED,
-} as const;
+export enum FirestoreErrorCode {
+  // Firestore Service errors (7000-7999)
+  DOCUMENT_NOT_FOUND = 7000,
+  COLLECTION_EMPTY = 7001,
+  BATCH_OPERATION_FAILED = 7002,
+  TRANSACTION_FAILED = 7003,
+  QUERY_FAILED = 7004,
+  DOCUMENT_CREATION_FAILED = 7005,
+  DOCUMENT_UPDATE_FAILED = 7006,
+  DOCUMENT_DELETION_FAILED = 7007,
+  INVALID_DOCUMENT_DATA = 7008,
+  CONNECTION_ERROR = 7009,
+  PERMISSION_DENIED = 7010,
+}
 
 /**
  * Error class for FirestoreService operations.
@@ -25,12 +26,12 @@ export const FirestoreErrorCode = {
 export class FirestoreServiceError extends AppError {
   constructor(
     message: string,
-    code: ErrorCode = ErrorCode.UNKNOWN_ERROR,
+    code: FirestoreErrorCode | ErrorCode = ErrorCode.UNKNOWN_ERROR,
     status = 500,
     details?: unknown,
     cause?: Error
   ) {
-    super(message, code, status, details, cause);
+    super(message, code as ErrorCode, status, details, cause);
     this.name = 'FirestoreServiceError';
   }
 

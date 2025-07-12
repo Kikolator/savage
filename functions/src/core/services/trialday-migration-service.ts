@@ -5,8 +5,8 @@ import {OfficeRndOpportunity, Trialday, TrialDayFormData} from '../data/models';
 import {TrialdayService} from './trialday-service';
 import {FirestoreService} from './firestore-service';
 import OfficeRndService from './office-rnd-service';
-import {SendgridService} from './sendgrid-service';
 import {EmailConfirmationService} from './email-confirmation-service';
+import {container} from './di/container';
 
 /**
  * Migration options to control behavior during migration
@@ -299,7 +299,7 @@ export class TrialdayMigrationService {
           const modifiedTrialdayService = new TrialdayService({
             firestoreService: this.firestoreService,
             sendgridService: sendEmails
-              ? SendgridService.getInstance()
+              ? container.resolve('sendgrid')
               : ({
                   mailSend: async () => {
                     logger.info(
@@ -310,10 +310,11 @@ export class TrialdayMigrationService {
                       }
                     );
                   },
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 } as any),
             emailConfirmationService: new EmailConfirmationService({
               firestoreService: this.firestoreService,
-              sendgridService: SendgridService.getInstance(),
+              sendgridService: container.resolve('sendgrid'),
             }),
             officeRndService: this.officeRndService,
           });
@@ -358,55 +359,6 @@ export class TrialdayMigrationService {
       createdTrialdays,
       skippedSubmissions,
       errors,
-    };
-  }
-
-  /**
-   * Creates a callable function for running migrations
-   * This can be called from the frontend or via HTTP request
-   */
-  public static createMigrationCallable() {
-    return async (data: {
-      type: 'legacy-opportunities' | 'typeform-submissions';
-      options: MigrationOptions;
-      typeformData?: TrialDayFormData[];
-    }) => {
-      const firestoreService = FirestoreService.getInstance();
-      const officeRndService = new OfficeRndService({firestoreService});
-      const trialdayService = new TrialdayService({
-        firestoreService,
-        sendgridService: SendgridService.getInstance(),
-        emailConfirmationService: new EmailConfirmationService({
-          firestoreService,
-          sendgridService: SendgridService.getInstance(),
-        }),
-        officeRndService,
-      });
-
-      const migrationService = new TrialdayMigrationService(
-        trialdayService,
-        firestoreService,
-        officeRndService
-      );
-
-      switch (data.type) {
-        case 'legacy-opportunities':
-          return await migrationService.migrateLegacyOpportunities(
-            data.options
-          );
-        case 'typeform-submissions':
-          if (!data.typeformData) {
-            throw new Error(
-              'typeformData is required for typeform-submissions migration'
-            );
-          }
-          return await migrationService.migrateTypeformSubmissions(
-            data.typeformData,
-            data.options
-          );
-        default:
-          throw new Error(`Unknown migration type: ${data.type}`);
-      }
     };
   }
 }

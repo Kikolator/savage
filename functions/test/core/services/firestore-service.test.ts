@@ -13,7 +13,10 @@ import {
 
 import {FirestoreService} from '../../../src/core/services/firestore-service';
 import {AppError, ErrorCode} from '../../../src/core/errors/app-error';
-import {FirestoreServiceError} from '../../../src/core/errors/services/firestore-service-error';
+import {
+  FirestoreServiceError,
+  FirestoreErrorCode,
+} from '../../../src/core/errors';
 import {CreateDoc, SetDoc, UpdateDoc} from '../../../src/core/data/models';
 import {
   mockFirestoreQuerySnapshot,
@@ -182,7 +185,7 @@ describe('FirestoreService', () => {
         firestoreService.createDocument(createDocData)
       ).rejects.toMatchObject({
         message: expect.stringContaining('Failed to create document'),
-        code: ErrorCode.DOCUMENT_CREATION_FAILED,
+        code: FirestoreErrorCode.DOCUMENT_CREATION_FAILED,
         status: 500,
       });
     });
@@ -199,18 +202,26 @@ describe('FirestoreService', () => {
         firestoreService.createDocument(createDocData)
       ).rejects.toMatchObject({
         message: expect.stringContaining('Permission denied'),
-        code: ErrorCode.PERMISSION_DENIED,
+        code: FirestoreErrorCode.PERMISSION_DENIED,
         status: 403,
       });
     });
 
-    it('should let unexpected errors bubble up', async () => {
+    it('should wrap unexpected errors in FirestoreServiceError', async () => {
       const unexpectedError = new Error('Network error');
       mockDoc.create.mockRejectedValue(unexpectedError);
 
       await expect(
         firestoreService.createDocument(createDocData)
-      ).rejects.toThrow('Network error');
+      ).rejects.toThrow(FirestoreServiceError);
+
+      await expect(
+        firestoreService.createDocument(createDocData)
+      ).rejects.toMatchObject({
+        message: expect.stringContaining('Failed to create document'),
+        code: FirestoreErrorCode.DOCUMENT_CREATION_FAILED,
+        status: 500,
+      });
     });
   });
 
@@ -245,7 +256,7 @@ describe('FirestoreService', () => {
         firestoreService.updateDocument(updateDocData)
       ).rejects.toMatchObject({
         message: expect.stringContaining('Document not found'),
-        code: ErrorCode.DOCUMENT_NOT_FOUND,
+        code: FirestoreErrorCode.DOCUMENT_NOT_FOUND,
         status: 404,
       });
     });
@@ -262,7 +273,7 @@ describe('FirestoreService', () => {
         firestoreService.updateDocument(updateDocData)
       ).rejects.toMatchObject({
         message: expect.stringContaining('Permission denied'),
-        code: ErrorCode.PERMISSION_DENIED,
+        code: FirestoreErrorCode.PERMISSION_DENIED,
         status: 403,
       });
     });
@@ -329,7 +340,7 @@ describe('FirestoreService', () => {
         firestoreService.setDocument(setDocData)
       ).rejects.toMatchObject({
         message: expect.stringContaining('Permission denied'),
-        code: ErrorCode.PERMISSION_DENIED,
+        code: FirestoreErrorCode.PERMISSION_DENIED,
         status: 403,
       });
     });
@@ -367,7 +378,7 @@ describe('FirestoreService', () => {
         firestoreService.getDocument('test-collection', 'test-id')
       ).rejects.toMatchObject({
         message: expect.stringContaining('Document not found'),
-        code: ErrorCode.DOCUMENT_NOT_FOUND,
+        code: FirestoreErrorCode.DOCUMENT_NOT_FOUND,
         status: 404,
       });
     });
@@ -384,7 +395,7 @@ describe('FirestoreService', () => {
         firestoreService.getDocument('test-collection', 'test-id')
       ).rejects.toMatchObject({
         message: expect.stringContaining('Permission denied'),
-        code: ErrorCode.PERMISSION_DENIED,
+        code: FirestoreErrorCode.PERMISSION_DENIED,
         status: 403,
       });
     });
@@ -443,10 +454,10 @@ describe('FirestoreService', () => {
       expect(result).toHaveLength(1);
     });
 
-    it('should throw AppError when subcollection parameters are missing', async () => {
+    it('should throw FirestoreServiceError when subcollection parameters are missing', async () => {
       await expect(
         firestoreService.getCollection('parent-collection', true)
-      ).rejects.toThrow(AppError);
+      ).rejects.toThrow(FirestoreServiceError);
 
       await expect(
         firestoreService.getCollection('parent-collection', true)
@@ -474,7 +485,7 @@ describe('FirestoreService', () => {
           'sub-collection'
         )
       ).rejects.toMatchObject({
-        code: ErrorCode.COLLECTION_EMPTY,
+        code: FirestoreErrorCode.COLLECTION_EMPTY,
         status: 404,
       });
     });
@@ -491,7 +502,7 @@ describe('FirestoreService', () => {
         firestoreService.getCollection('test-collection')
       ).rejects.toMatchObject({
         message: expect.stringContaining('Permission denied'),
-        code: ErrorCode.PERMISSION_DENIED,
+        code: FirestoreErrorCode.PERMISSION_DENIED,
         status: 403,
       });
     });
@@ -535,10 +546,10 @@ describe('FirestoreService', () => {
       expect(result.refs).toHaveLength(1);
     });
 
-    it('should throw AppError when subcollection parameters are missing', async () => {
+    it('should throw FirestoreServiceError when subcollection parameters are missing', async () => {
       await expect(
         firestoreService.getCollectionWithRefs('parent-collection', true)
-      ).rejects.toThrow(AppError);
+      ).rejects.toThrow(FirestoreServiceError);
     });
 
     it('should throw FirestoreServiceError when permission denied', async () => {
@@ -613,7 +624,7 @@ describe('FirestoreService', () => {
         firestoreService.queryCollection('test-collection', filters)
       ).rejects.toMatchObject({
         message: expect.stringContaining('Permission denied'),
-        code: ErrorCode.PERMISSION_DENIED,
+        code: FirestoreErrorCode.PERMISSION_DENIED,
         status: 403,
       });
     });
@@ -630,7 +641,7 @@ describe('FirestoreService', () => {
         firestoreService.queryCollection('test-collection', filters)
       ).rejects.toMatchObject({
         message: expect.stringContaining('Query failed'),
-        code: ErrorCode.QUERY_FAILED,
+        code: FirestoreErrorCode.QUERY_FAILED,
         status: 500,
       });
     });
@@ -680,7 +691,7 @@ describe('FirestoreService', () => {
         firestoreService.queryCollectionSnapshot('test-collection', filters)
       ).rejects.toMatchObject({
         message: expect.stringContaining('Permission denied'),
-        code: ErrorCode.PERMISSION_DENIED,
+        code: FirestoreErrorCode.PERMISSION_DENIED,
         status: 403,
       });
     });
@@ -697,7 +708,7 @@ describe('FirestoreService', () => {
         firestoreService.queryCollectionSnapshot('test-collection', filters)
       ).rejects.toMatchObject({
         message: expect.stringContaining('Query failed'),
-        code: ErrorCode.QUERY_FAILED,
+        code: FirestoreErrorCode.QUERY_FAILED,
         status: 500,
       });
     });
@@ -776,7 +787,7 @@ describe('FirestoreService', () => {
         firestoreService.runBatch(batchFunction as any)
       ).rejects.toMatchObject({
         message: expect.stringContaining('Batch operation'),
-        code: ErrorCode.BATCH_OPERATION_FAILED,
+        code: FirestoreErrorCode.BATCH_OPERATION_FAILED,
         status: 500,
       });
     });
@@ -794,7 +805,7 @@ describe('FirestoreService', () => {
         firestoreService.runBatch(batchFunction as any)
       ).rejects.toMatchObject({
         message: expect.stringContaining('Permission denied'),
-        code: ErrorCode.PERMISSION_DENIED,
+        code: FirestoreErrorCode.PERMISSION_DENIED,
         status: 403,
       });
     });
@@ -914,7 +925,7 @@ describe('FirestoreService', () => {
         firestoreService.runTransaction(mockUpdateFunction as any)
       ).rejects.toMatchObject({
         message: expect.stringContaining('Transaction'),
-        code: ErrorCode.TRANSACTION_FAILED,
+        code: FirestoreErrorCode.TRANSACTION_FAILED,
         status: 500,
       });
     });
@@ -939,7 +950,7 @@ describe('FirestoreService', () => {
         firestoreService.runTransaction(mockUpdateFunction as any)
       ).rejects.toMatchObject({
         message: expect.stringContaining('Permission denied'),
-        code: ErrorCode.PERMISSION_DENIED,
+        code: FirestoreErrorCode.PERMISSION_DENIED,
         status: 403,
       });
     });
@@ -1055,7 +1066,7 @@ describe('FirestoreService', () => {
       );
 
       expect(mockTransaction.get).toHaveBeenCalledWith(expect.anything());
-      expect(result.data()).toEqual(mockData);
+      expect(result).toEqual(mockData);
     });
 
     it('should query collection with transaction', async () => {

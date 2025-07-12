@@ -4,7 +4,6 @@ import {ClientRequest} from '@sendgrid/client/src/request';
 import {ClientResponse, MailService} from '@sendgrid/mail';
 import {MailDataRequired} from '@sendgrid/helpers/classes/mail';
 // Project imports
-import {logger} from 'firebase-functions';
 import {DocumentData} from 'firebase-admin/firestore';
 
 import {
@@ -15,116 +14,211 @@ import {
   SendgridListResponse,
   OfficeRndMember,
 } from '../data/models';
-import {AppError, ErrorCode} from '../errors/app-error';
 import {getConfig} from '../config';
+import {
+  SendgridServiceError,
+  FirestoreServiceError,
+  FirestoreErrorCode,
+} from '../errors';
 import {isDevelopment} from '../utils/environment';
 import {OfficeRndMemberStatus} from '../data/enums';
 
+import {BaseServiceWithDependencies} from './base-service';
 import {FirestoreService} from './firestore-service';
 
-export class SendgridService {
+interface SendgridServiceDependencies {
+  firestoreService: FirestoreService;
+}
+
+export class SendgridService extends BaseServiceWithDependencies<SendgridServiceDependencies> {
   private apiKey: string | null = null;
   private client: Client | null = null;
   private mail: MailService | null = null;
-  private static instance: SendgridService;
+  private static instance: SendgridService | null = null;
+  private readonly config: ReturnType<typeof getConfig>['runtime']['sendgrid'];
 
-  private constructor() {
-    // empty constructor, initialization will happen lazily
+  constructor(dependencies: SendgridServiceDependencies) {
+    super(dependencies);
+    // Get runtime config when service is instantiated
+    const appConfig = getConfig();
+    this.config = appConfig.runtime.sendgrid;
   }
 
-  public static getInstance(): SendgridService {
+  /**
+   * Get singleton instance of SendgridService
+   * @param dependencies - Required dependencies for the service
+   * @returns Singleton instance of SendgridService
+   */
+  public static getInstance(
+    dependencies: SendgridServiceDependencies
+  ): SendgridService {
     if (!SendgridService.instance) {
-      SendgridService.instance = new SendgridService();
+      SendgridService.instance = new SendgridService(dependencies);
     }
     return SendgridService.instance;
   }
 
-  private initialize() {
-    if (!this.apiKey) {
-      const config = getConfig();
-      this.apiKey = config.sendgrid.apiKey;
-    }
-    if (!this.client) {
-      this.client = new Client();
-      this.client.setApiKey(this.apiKey);
-    }
-    if (!this.mail) {
-      this.mail = new MailService();
-      this.mail.setApiKey(this.apiKey);
-    }
-    return;
+  /**
+   * Reset the singleton instance (useful for testing)
+   */
+  public static reset(): void {
+    SendgridService.instance = null;
   }
 
+  /**
+   * Get the FirestoreService dependency
+   */
+  private get firestoreService(): FirestoreService {
+    return this.getDependency('firestoreService');
+  }
+
+  /**
+   * Initialize SendGrid client and mail service
+   */
+  protected async performInitialization(): Promise<void> {
+    try {
+      this.logMethodEntry('performInitialization');
+
+      if (!this.apiKey) {
+        this.apiKey = this.config.apiKey;
+        if (!this.apiKey) {
+          throw SendgridServiceError.apiKeyMissing();
+        }
+      }
+
+      if (!this.client) {
+        this.client = new Client();
+        this.client.setApiKey(this.apiKey);
+      }
+
+      if (!this.mail) {
+        this.mail = new MailService();
+        this.mail.setApiKey(this.apiKey);
+      }
+
+      this.logMethodSuccess('performInitialization');
+    } catch (error) {
+      this.logMethodError('performInitialization', error as Error);
+      if (error instanceof SendgridServiceError) {
+        throw error;
+      }
+      throw SendgridServiceError.unknownError(
+        'Failed to initialize SendGrid service',
+        {error}
+      );
+    }
+  }
+
+  /**
+   * Add contacts to SendGrid lists
+   */
   public async addContacts(
     lists: Array<string>,
     contacts: Array<SendgridContactRequest>
   ): Promise<string> {
-    logger.info('SendgridService.addContact()- Adding contact');
-    this.initialize();
-    if (!this.client) {
-      throw new AppError(
-        'Sendgrid client not initialized',
-        ErrorCode.UNKNOWN_ERROR
-      );
-    }
-    const request: ClientRequest = {
-      url: '/v3/marketing/contacts',
-      method: 'PUT',
-      body: {
-        list_ids: lists,
-        contacts: contacts,
-      },
-    };
-    if (isDevelopment()) {
-      logger.debug(
-        'SendgridService.addContact()- In development mode, the contact will not be added to Sendgrid'
-      );
-      return 'fake-contact-id';
-    } else {
+    this.logMethodEntry('addContacts', {
+      listsCount: lists.length,
+      contactsCount: contacts.length,
+    });
+
+    try {
+      await this.ensureInitialized();
+
+      if (!this.client) {
+        throw SendgridServiceError.clientNotInitialized('addContacts');
+      }
+
+      const request: ClientRequest = {
+        url: '/v3/marketing/contacts',
+        method: 'PUT',
+        body: {
+          list_ids: lists,
+          contacts: contacts,
+        },
+      };
+
+      if (isDevelopment()) {
+        this.logMethodSuccess('addContacts', {developmentMode: true});
+        return 'fake-contact-id';
+      }
+
       const [response, body] = await this.client.request(request);
+
       if (response.statusCode !== 202) {
-        throw new Error(
-          `Error adding Sendgrid contact: ${response.statusCode} ${response.body}`
+        throw SendgridServiceError.contactAdditionFailed(
+          'addContacts',
+          response.statusCode,
+          response.body
         );
       }
+
+      this.logMethodSuccess('addContacts', {
+        responseStatus: response.statusCode,
+      });
       return body;
+    } catch (error) {
+      this.logMethodError('addContacts', error as Error);
+      if (error instanceof SendgridServiceError) {
+        throw error;
+      }
+      throw SendgridServiceError.contactAdditionFailed(
+        'addContacts',
+        0,
+        undefined,
+        error as Error
+      );
     }
   }
 
-  // Sends an email to one or more recipients.
-  // If isMultiple is true, the multiple recipients will not see eachothers
-  // email addresses.
+  /**
+   * Send an email to one or more recipients
+   * If isMultiple is true, the multiple recipients will not see each other's email addresses
+   */
   public async mailSend(
     mailData: MailDataRequired,
     isMultiple = false
   ): Promise<void> {
-    logger.info('SendgridService.mailSend()- Sending email');
-    this.initialize();
-    if (!this.mail) {
-      throw new AppError(
-        'Sendgrid mail service not initialized',
-        ErrorCode.UNKNOWN_ERROR
-      );
-    }
-    if (isDevelopment()) {
-      logger.debug(
-        'SendgridService.mailSend()- In development mode, the email will not be sent'
-      );
-      return;
-    } else {
-      // Send the email(s)
+    this.logMethodEntry('mailSend', {isMultiple, to: mailData.to});
+
+    try {
+      await this.ensureInitialized();
+
+      if (!this.mail) {
+        throw SendgridServiceError.mailServiceNotInitialized('mailSend');
+      }
+
+      if (isDevelopment()) {
+        this.logMethodSuccess('mailSend', {developmentMode: true});
+        return;
+      }
+
       const response: [ClientResponse, object] = await this.mail.send(
         mailData,
         isMultiple
       );
-      // Check the response
+
       if (response[0].statusCode !== 202) {
-        throw new AppError(
-          `Error sending Sendgrid mail: ${response[0].statusCode} ${response[0].body}`,
-          ErrorCode.SENDGRID_MAIL_SEND_FAILED
+        throw SendgridServiceError.mailSendFailed(
+          'mailSend',
+          response[0].statusCode,
+          response[0].body
         );
       }
-      return;
+
+      this.logMethodSuccess('mailSend', {
+        responseStatus: response[0].statusCode,
+      });
+    } catch (error) {
+      this.logMethodError('mailSend', error as Error);
+      if (error instanceof SendgridServiceError) {
+        throw error;
+      }
+      throw SendgridServiceError.mailSendFailed(
+        'mailSend',
+        0,
+        undefined,
+        error as Error
+      );
     }
   }
 
@@ -136,14 +230,14 @@ export class SendgridService {
     member: OfficeRndMember,
     previousMember?: OfficeRndMember
   ): Promise<void> {
-    try {
-      logger.info('SendgridService.syncMemberToSendGrid', {
-        memberId: member._id,
-        email: member.email,
-        status: member.status,
-        previousStatus: previousMember?.status,
-      });
+    this.logMethodEntry('syncMemberToSendGrid', {
+      memberId: member._id,
+      email: member.email,
+      status: member.status,
+      previousStatus: previousMember?.status,
+    });
 
+    try {
       // Determine which lists this member should be in
       const targetListNames = this.determineTargetListNames(member);
 
@@ -157,65 +251,60 @@ export class SendgridService {
       if (targetListIds.length > 0) {
         await this.addContacts(targetListIds, [contact]);
 
-        logger.info('Successfully synced member to SendGrid', {
+        this.logMethodSuccess('syncMemberToSendGrid', {
           memberId: member._id,
           email: member.email,
           lists: targetListNames,
           listIds: targetListIds,
         });
       } else {
-        logger.info('Member not added to any SendGrid lists', {
+        this.logMethodSuccess('syncMemberToSendGrid', {
           memberId: member._id,
           email: member.email,
           reason: 'No matching list criteria',
         });
       }
     } catch (error) {
-      logger.error('Failed to sync member to SendGrid', {
-        memberId: member._id,
-        email: member.email,
-        error: error instanceof Error ? error.message : 'unknown error',
-      });
+      this.logMethodError('syncMemberToSendGrid', error as Error);
       // Don't throw to avoid breaking the webhook flow
+      // Just log the error and continue
     }
   }
-
-  // ===== READ OPERATIONS (From Firestore) =====
 
   /**
    * Gets all SendGrid lists from Firestore (source of truth)
    */
   public async getLists(): Promise<Array<SendgridList>> {
-    logger.info(
-      'SendgridService.getLists() - Getting all lists from Firestore'
-    );
+    this.logMethodEntry('getLists');
 
     try {
-      const firestoreService = FirestoreService.getInstance();
-      const query = await firestoreService.getCollection(
+      const query = await this.firestoreService.getCollection(
         'sendgrid/metadata/lists'
       );
       const listsResult: Array<SendgridList> = [];
 
-      query.forEach((documentData) => {
+      query.forEach((documentData: DocumentData) => {
         listsResult.push(documentData as SendgridList);
       });
 
       if (listsResult.length === 0) {
-        logger.warn(
-          'SendgridService.getLists() - No lists found in Firestore. Scheduled sync may not be working.'
-        );
+        this.logMethodSuccess('getLists', {
+          warning: 'No lists found in Firestore',
+        });
+      } else {
+        this.logMethodSuccess('getLists', {count: listsResult.length});
       }
 
       return listsResult;
     } catch (error) {
+      this.logMethodError('getLists', error as Error);
       if (
-        error instanceof AppError &&
-        error.code === ErrorCode.COLLECTION_EMPTY
+        error instanceof FirestoreServiceError &&
+        Number(error.code) === FirestoreErrorCode.COLLECTION_EMPTY
       ) {
-        logger.warn(
-          'SendgridService.getLists() - Lists collection is empty. Scheduled sync may not be working.'
-        );
+        this.logMethodSuccess('getLists', {
+          warning: 'Lists collection is empty',
+        });
         return [];
       }
       throw error;
@@ -226,114 +315,152 @@ export class SendgridService {
    * Gets all SendGrid custom fields from Firestore (source of truth)
    */
   public async getCustomFields(): Promise<Array<SendgridCustomField>> {
-    logger.info(
-      'SendgridService.getCustomFields() - Getting all custom fields from Firestore'
-    );
+    this.logMethodEntry('getCustomFields');
 
     try {
-      const firestoreService = FirestoreService.getInstance();
-      const query = await firestoreService.getCollection(
+      const query = await this.firestoreService.getCollection(
         'sendgrid/metadata/customFields'
       );
       const customFieldsResult: Array<SendgridCustomField> = [];
 
-      query.forEach((documentData) => {
+      query.forEach((documentData: DocumentData) => {
         customFieldsResult.push(documentData as SendgridCustomField);
       });
 
       if (customFieldsResult.length === 0) {
-        logger.warn(
-          'SendgridService.getCustomFields() - No custom fields found in Firestore. Scheduled sync may not be working.'
-        );
+        this.logMethodSuccess('getCustomFields', {
+          warning: 'No custom fields found in Firestore',
+        });
+      } else {
+        this.logMethodSuccess('getCustomFields', {
+          count: customFieldsResult.length,
+        });
       }
 
       return customFieldsResult;
     } catch (error) {
+      this.logMethodError('getCustomFields', error as Error);
       if (
-        error instanceof AppError &&
-        error.code === ErrorCode.COLLECTION_EMPTY
+        error instanceof FirestoreServiceError &&
+        Number(error.code) === FirestoreErrorCode.COLLECTION_EMPTY
       ) {
-        logger.warn(
-          'SendgridService.getCustomFields() - Custom fields collection is empty. Scheduled sync may not be working.'
-        );
+        this.logMethodSuccess('getCustomFields', {
+          warning: 'Custom fields collection is empty',
+        });
         return [];
       }
       throw error;
     }
   }
 
-  // ===== WRITE OPERATIONS (To SendGrid API) =====
-
-  // ===== API METHODS (For scheduled sync) =====
-
   /**
    * Gets all SendGrid lists from SendGrid API (for scheduled sync)
    */
   public async getListsFromAPI(): Promise<Array<SendgridList>> {
-    logger.info(
-      'SendgridService.getListsFromAPI() - Getting all lists from SendGrid API'
-    );
-    this.initialize();
-    if (!this.client) {
-      throw new AppError(
-        'Sendgrid client not initialized',
-        ErrorCode.UNKNOWN_ERROR
-      );
-    }
-    const request: ClientRequest = {
-      url: '/v3/marketing/lists',
-      method: 'GET',
-    };
-    const [response, body] = await this.client.request(request);
-    if (response.statusCode !== 200) {
-      throw new Error(
-        `Error getting Sendgrid lists: ${response.statusCode} ${response.body}`
-      );
-    }
-    const lists: Array<SendgridList> = [];
-    body.result.forEach((list: SendgridListResponse) => {
-      lists.push({
-        id: list.id,
-        name: list.name,
-        contactCount: list.contact_count,
+    this.logMethodEntry('getListsFromAPI');
+
+    try {
+      await this.ensureInitialized();
+
+      if (!this.client) {
+        throw SendgridServiceError.clientNotInitialized('getListsFromAPI');
+      }
+
+      const request: ClientRequest = {
+        url: '/v3/marketing/lists',
+        method: 'GET',
+      };
+
+      const [response, body] = await this.client.request(request);
+
+      if (response.statusCode !== 200) {
+        throw SendgridServiceError.listsFetchFailed(
+          'getListsFromAPI',
+          response.statusCode,
+          response.body
+        );
+      }
+
+      const lists: Array<SendgridList> = [];
+      body.result.forEach((list: SendgridListResponse) => {
+        lists.push({
+          id: list.id,
+          name: list.name,
+          contactCount: list.contact_count,
+        });
       });
-    });
-    return lists;
+
+      this.logMethodSuccess('getListsFromAPI', {count: lists.length});
+      return lists;
+    } catch (error) {
+      this.logMethodError('getListsFromAPI', error as Error);
+      if (error instanceof SendgridServiceError) {
+        throw error;
+      }
+      throw SendgridServiceError.listsFetchFailed(
+        'getListsFromAPI',
+        0,
+        undefined,
+        error as Error
+      );
+    }
   }
 
   /**
    * Gets all SendGrid custom fields from SendGrid API (for scheduled sync)
    */
   public async getCustomFieldsFromAPI(): Promise<Array<SendgridCustomField>> {
-    logger.info(
-      'SendgridService.getCustomFieldsFromAPI() - Getting all custom fields from SendGrid API'
-    );
-    this.initialize();
-    if (!this.client) {
-      throw new AppError(
-        'Sendgrid client not initialized',
-        ErrorCode.UNKNOWN_ERROR
-      );
-    }
-    const request: ClientRequest = {
-      url: '/v3/marketing/field_definitions',
-      method: 'GET',
-    };
-    const [response, body] = await this.client.request(request);
-    if (response.statusCode !== 200) {
-      throw new Error(
-        `Error getting Sendgrid custom fields: ${response.statusCode} ${response.body}`
-      );
-    }
-    const customFields: Array<SendgridCustomField> = [];
-    body.custom_fields.forEach((field: SendgridCustomFieldResponse) => {
-      customFields.push({
-        id: field.id,
-        name: field.name,
-        type: field.field_type,
+    this.logMethodEntry('getCustomFieldsFromAPI');
+
+    try {
+      await this.ensureInitialized();
+
+      if (!this.client) {
+        throw SendgridServiceError.clientNotInitialized(
+          'getCustomFieldsFromAPI'
+        );
+      }
+
+      const request: ClientRequest = {
+        url: '/v3/marketing/field_definitions',
+        method: 'GET',
+      };
+
+      const [response, body] = await this.client.request(request);
+
+      if (response.statusCode !== 200) {
+        throw SendgridServiceError.customFieldsFetchFailed(
+          'getCustomFieldsFromAPI',
+          response.statusCode,
+          response.body
+        );
+      }
+
+      const customFields: Array<SendgridCustomField> = [];
+      body.custom_fields.forEach((field: SendgridCustomFieldResponse) => {
+        customFields.push({
+          id: field.id,
+          name: field.name,
+          type: field.field_type,
+        });
       });
-    });
-    return customFields;
+
+      this.logMethodSuccess('getCustomFieldsFromAPI', {
+        count: customFields.length,
+      });
+      return customFields;
+    } catch (error) {
+      this.logMethodError('getCustomFieldsFromAPI', error as Error);
+      if (error instanceof SendgridServiceError) {
+        throw error;
+      }
+      throw SendgridServiceError.customFieldsFetchFailed(
+        'getCustomFieldsFromAPI',
+        0,
+        undefined,
+        error as Error
+      );
+    }
   }
 
   /**
@@ -368,12 +495,11 @@ export class SendgridService {
    */
   private async resolveListIds(listNames: string[]): Promise<string[]> {
     const listIds: string[] = [];
-    const firestoreService = FirestoreService.getInstance();
 
     for (const listName of listNames) {
       try {
         // Query Firestore for the list by name
-        const lists = await firestoreService.queryCollection(
+        const lists = await this.firestoreService.queryCollection(
           'sendgrid/metadata/lists',
           [
             {
@@ -385,25 +511,30 @@ export class SendgridService {
         );
 
         if (lists.length === 0) {
-          logger.warn(`SendGrid list not found: ${listName}`);
+          this.logMethodError(
+            'resolveListIds',
+            new Error(`SendGrid list not found: ${listName}`)
+          );
           continue;
         }
 
         if (lists.length > 1) {
-          logger.warn(`Multiple SendGrid lists found with name: ${listName}`, {
-            count: lists.length,
-          });
+          this.logMethodError(
+            'resolveListIds',
+            new Error(`Multiple SendGrid lists found with name: ${listName}`)
+          );
         }
 
         // Use the first matching list
         const list = lists[0] as SendgridList;
         listIds.push(list.id);
-
-        logger.info(`Resolved list name to ID: ${listName} -> ${list.id}`);
       } catch (error) {
-        logger.error(`Failed to resolve list ID for: ${listName}`, {
-          error: error instanceof Error ? error.message : 'unknown error',
-        });
+        this.logMethodError('resolveListIds', error as Error);
+        throw SendgridServiceError.listResolutionFailed(
+          'resolveListIds',
+          listName,
+          error as Error
+        );
       }
     }
 
@@ -411,48 +542,57 @@ export class SendgridService {
   }
 
   /**
-   * Creates a SendGrid contact object from an Office Rnd member
+   * Creates a SendGrid contact object from an Office R nd member
    */
   private async createContactFromMember(
     member: OfficeRndMember
   ): Promise<SendgridContactRequest> {
-    // Extract first and last name from full name
-    const nameParts = member.name.split(' ');
-    const firstName = nameParts[0] || '';
-    const lastName = nameParts.slice(1).join(' ') || '';
+    try {
+      // Extract first and last name from full name
+      const nameParts = member.name.split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
 
-    // Get custom field mappings from Firestore
-    const customFields = await this.getCustomFieldMappings();
+      // Get custom field mappings from Firestore
+      const customFields = await this.getCustomFieldMappings();
 
-    return {
-      email: member.email,
-      first_name: firstName,
-      last_name: lastName,
-      phone_number_id: member.properties?.phoneNumber,
-      custom_fields: {
-        // Map Office Rnd data to SendGrid custom fields
-        [customFields.membership_status || 'membership_status']: member.status,
-        [customFields.membership_start_date || 'membership_start_date']:
-          member.startDate?.toISOString() || '',
-        [customFields.trialday_completed || 'trialday_completed']:
-          member.properties?.trialdayCompleted?.toString() || 'false',
-        [customFields.referral_code_used || 'referral_code_used']:
-          member.properties?.referralCodeUsed || '',
-        [customFields.referral_permission || 'referral_permission']:
-          member.properties?.referralPermission?.toString() || 'false',
-        [customFields.access_code || 'access_code']:
-          member.properties?.accessCode || '',
-        [customFields.newsletter_opt_in || 'newsletter_opt_in']:
-          member.properties?.receiveNewsletter?.toString() || 'false',
-        [customFields.member_id || 'member_id']: member._id,
-        [customFields.company_id || 'company_id']: member.company || '',
-        [customFields.location_id || 'location_id']: member.location,
-        [customFields.created_at || 'created_at']:
-          member.createdAt?.toISOString() || '',
-        [customFields.modified_at || 'modified_at']:
-          member.modifiedAt?.toISOString() || '',
-      },
-    };
+      return {
+        email: member.email,
+        first_name: firstName,
+        last_name: lastName,
+        phone_number_id: member.properties?.phoneNumber,
+        custom_fields: {
+          // Map Office R nd data to SendGrid custom fields
+          [customFields.membership_status || 'membership_status']:
+            member.status,
+          [customFields.membership_start_date || 'membership_start_date']:
+            member.startDate?.toISOString() || '',
+          [customFields.trialday_completed || 'trialday_completed']:
+            member.properties?.trialdayCompleted?.toString() || 'false',
+          [customFields.referral_code_used || 'referral_code_used']:
+            member.properties?.referralCodeUsed || '',
+          [customFields.referral_permission || 'referral_permission']:
+            member.properties?.referralPermission?.toString() || 'false',
+          [customFields.access_code || 'access_code']:
+            member.properties?.accessCode || '',
+          [customFields.newsletter_opt_in || 'newsletter_opt_in']:
+            member.properties?.receiveNewsletter?.toString() || 'false',
+          [customFields.member_id || 'member_id']: member._id,
+          [customFields.company_id || 'company_id']: member.company || '',
+          [customFields.location_id || 'location_id']: member.location,
+          [customFields.created_at || 'created_at']:
+            member.createdAt?.toISOString() || '',
+          [customFields.modified_at || 'modified_at']:
+            member.modifiedAt?.toISOString() || '',
+        },
+      };
+    } catch (error) {
+      throw SendgridServiceError.contactCreationFailed(
+        'createContactFromMember',
+        member._id,
+        error as Error
+      );
+    }
   }
 
   /**
@@ -460,9 +600,8 @@ export class SendgridService {
    */
   private async getCustomFieldMappings(): Promise<{[key: string]: string}> {
     try {
-      const firestoreService = FirestoreService.getInstance();
       // Get all custom fields from Firestore
-      const customFields = await firestoreService.getCollection(
+      const customFields = await this.firestoreService.getCollection(
         'sendgrid/metadata/customFields'
       );
 
@@ -477,28 +616,11 @@ export class SendgridService {
 
       return mappings;
     } catch (error) {
-      logger.warn(
-        'Failed to get custom field mappings, using default field names',
-        {
-          error: error instanceof Error ? error.message : 'unknown error',
-        }
+      this.logMethodError('getCustomFieldMappings', error as Error);
+      throw SendgridServiceError.customFieldMappingsFailed(
+        'getCustomFieldMappings',
+        error as Error
       );
-
-      // Return default field names if metadata is not available
-      return {
-        membership_status: 'membership_status',
-        membership_start_date: 'membership_start_date',
-        trialday_completed: 'trialday_completed',
-        referral_code_used: 'referral_code_used',
-        referral_permission: 'referral_permission',
-        access_code: 'access_code',
-        newsletter_opt_in: 'newsletter_opt_in',
-        member_id: 'member_id',
-        company_id: 'company_id',
-        location_id: 'location_id',
-        created_at: 'created_at',
-        modified_at: 'modified_at',
-      };
     }
   }
 
@@ -508,27 +630,26 @@ export class SendgridService {
   public async removeMemberFromSendGrid(
     member: OfficeRndMember
   ): Promise<void> {
-    try {
-      logger.info('SendgridService.removeMemberFromSendGrid', {
-        memberId: member._id,
-        email: member.email,
-      });
+    this.logMethodEntry('removeMemberFromSendGrid', {
+      memberId: member._id,
+      email: member.email,
+    });
 
+    try {
       // TODO: Implement contact removal
       // SendGrid doesn't have a direct "remove from all lists" API
       // We would need to remove from each list individually.
       // This is not a priority for now.
 
-      logger.info('Member removal from SendGrid completed', {
+      this.logMethodSuccess('removeMemberFromSendGrid', {
         memberId: member._id,
         email: member.email,
+        note: 'Removal not yet implemented',
       });
     } catch (error) {
-      logger.error('Failed to remove member from SendGrid', {
-        memberId: member._id,
-        email: member.email,
-        error: error instanceof Error ? error.message : 'unknown error',
-      });
+      this.logMethodError('removeMemberFromSendGrid', error as Error);
+      // Don't throw to avoid breaking the webhook flow
+      // Just log the error and continue
     }
   }
 }

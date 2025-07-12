@@ -10,17 +10,18 @@ import {
   WriteBatch,
   Timestamp,
 } from 'firebase-admin/firestore';
-import {logger} from 'firebase-functions';
 
 import {CreateDoc, SetDoc, UpdateDoc} from '../data/models';
-import {FirestoreServiceError} from '../errors';
+import {FirestoreServiceError, FirestoreErrorCode} from '../errors';
 
-export class FirestoreService {
+import {BaseService} from './base-service';
+
+export class FirestoreService extends BaseService {
   private db: Firestore | null = null;
-  private static instance: FirestoreService;
+  private static instance: FirestoreService | null = null;
 
   private constructor() {
-    // Empty constructor, initialization will happen lazily.
+    super();
   }
 
   public static getInstance(): FirestoreService {
@@ -28,6 +29,18 @@ export class FirestoreService {
       FirestoreService.instance = new FirestoreService();
     }
     return FirestoreService.instance;
+  }
+
+  public static reset(): void {
+    FirestoreService.instance = null;
+  }
+
+  /**
+   * Perform Firestore initialization
+   */
+  protected async performInitialization(): Promise<void> {
+    // Firestore is initialized lazily when first accessed
+    this.getDb();
   }
 
   private getDb(): Firestore {
@@ -43,15 +56,14 @@ export class FirestoreService {
    * @param data - The document creation data
    */
   public async createDocument(data: CreateDoc) {
-    logger.info(
-      'FirestoreService.createDocument()- creating document in Firestore.',
-      {
-        collection: data.collection,
-        documentId: data.documentId,
-      }
-    );
+    const methodName = 'createDocument';
+    this.logMethodEntry(methodName, {
+      collection: data.collection,
+      documentId: data.documentId,
+    });
 
     try {
+      await this.ensureInitialized();
       const db = this.getDb();
       let docRef;
       if (!data.documentId) {
@@ -64,7 +76,10 @@ export class FirestoreService {
         created_at: this.getServerTimestamp(),
         updated_at: this.getServerTimestamp(),
       });
+      this.logMethodSuccess(methodName);
     } catch (error) {
+      this.logMethodError(methodName, error as Error);
+
       // Transform Firestore errors to provide better context
       if (error instanceof Error) {
         if (error.message.includes('ALREADY_EXISTS')) {
@@ -81,8 +96,14 @@ export class FirestoreService {
             error
           );
         }
-        // Let other errors bubble up as they might be unexpected
-        throw error;
+        // For other unexpected errors, wrap them in a FirestoreServiceError
+        throw new FirestoreServiceError(
+          `Failed to create document in collection '${data.collection}'`,
+          FirestoreErrorCode.DOCUMENT_CREATION_FAILED,
+          500,
+          {collection: data.collection, documentId: data.documentId},
+          error
+        );
       }
       throw error;
     }
@@ -94,22 +115,24 @@ export class FirestoreService {
    * @param data - The document update data
    */
   public async updateDocument(data: UpdateDoc) {
-    logger.info([
-      'FirestoreService.updateDocument()- updating document in Firestore.',
-      {
-        collection: data.collection,
-        documentId: data.documentId,
-      },
-    ]);
+    const methodName = 'updateDocument';
+    this.logMethodEntry(methodName, {
+      collection: data.collection,
+      documentId: data.documentId,
+    });
 
     try {
+      await this.ensureInitialized();
       const db = this.getDb();
       const docRef = db.collection(data.collection).doc(data.documentId);
       await docRef.update({
         ...data.data,
         updated_at: this.getServerTimestamp(),
       });
+      this.logMethodSuccess(methodName);
     } catch (error) {
+      this.logMethodError(methodName, error as Error);
+
       // Transform Firestore errors to provide better context
       if (error instanceof Error) {
         if (error.message.includes('NOT_FOUND')) {
@@ -126,8 +149,14 @@ export class FirestoreService {
             error
           );
         }
-        // Let other errors bubble up as they might be unexpected
-        throw error;
+        // For other unexpected errors, wrap them in a FirestoreServiceError
+        throw new FirestoreServiceError(
+          `Failed to update document in collection '${data.collection}'`,
+          FirestoreErrorCode.DOCUMENT_UPDATE_FAILED,
+          500,
+          {collection: data.collection, documentId: data.documentId},
+          error
+        );
       }
       throw error;
     }
@@ -142,16 +171,15 @@ export class FirestoreService {
    * @param data - The document set data
    */
   public async setDocument(data: SetDoc) {
-    logger.info([
-      'FirestoreService.setDocument()- setting document in Firestore.',
-      {
-        collection: data.collection,
-        documentId: data.documentId,
-        merge: data.merge,
-      },
-    ]);
+    const methodName = 'setDocument';
+    this.logMethodEntry(methodName, {
+      collection: data.collection,
+      documentId: data.documentId,
+      merge: data.merge,
+    });
 
     try {
+      await this.ensureInitialized();
       const db = this.getDb();
       let docRef;
       if (!data.documentId) {
@@ -166,7 +194,10 @@ export class FirestoreService {
         },
         {merge: data.merge !== undefined ? data.merge : true}
       );
+      this.logMethodSuccess(methodName);
     } catch (error) {
+      this.logMethodError(methodName, error as Error);
+
       // Transform Firestore errors to provide better context
       if (error instanceof Error) {
         if (error.message.includes('PERMISSION_DENIED')) {
@@ -176,8 +207,14 @@ export class FirestoreService {
             error
           );
         }
-        // Let other errors bubble up as they might be unexpected
-        throw error;
+        // For other unexpected errors, wrap them in a FirestoreServiceError
+        throw new FirestoreServiceError(
+          `Failed to set document in collection '${data.collection}'`,
+          FirestoreErrorCode.DOCUMENT_UPDATE_FAILED,
+          500,
+          {collection: data.collection, documentId: data.documentId},
+          error
+        );
       }
       throw error;
     }
@@ -188,21 +225,20 @@ export class FirestoreService {
    * @param collection - The collection name
    * @param documentId - The document ID
    * @returns Promise that resolves to the document data
-   * @throws AppError if document is not found
+   * @throws FirestoreServiceError if document is not found
    */
   public async getDocument(
     collection: string,
     documentId: string
   ): Promise<DocumentData> {
-    logger.info([
-      'FirestoreService.getDocument()- getting document from Firestore.',
-      {
-        collection: collection,
-        documentId: documentId,
-      },
-    ]);
+    const methodName = 'getDocument';
+    this.logMethodEntry(methodName, {
+      collection: collection,
+      documentId: documentId,
+    });
 
     try {
+      await this.ensureInitialized();
       const db = this.getDb();
       const docRef = db.collection(collection).doc(documentId);
       const doc = await docRef.get();
@@ -210,8 +246,11 @@ export class FirestoreService {
       if (!data) {
         throw FirestoreServiceError.documentNotFound(collection, documentId);
       }
+      this.logMethodSuccess(methodName);
       return data;
     } catch (error) {
+      this.logMethodError(methodName, error as Error);
+
       // If it's already our custom error, re-throw it
       if (error instanceof FirestoreServiceError) {
         throw error;
@@ -226,8 +265,14 @@ export class FirestoreService {
             error
           );
         }
-        // Let other errors bubble up as they might be unexpected
-        throw error;
+        // For other unexpected errors, wrap them in a FirestoreServiceError
+        throw new FirestoreServiceError(
+          `Failed to get document from collection '${collection}'`,
+          FirestoreErrorCode.DOCUMENT_NOT_FOUND,
+          500,
+          {collection, documentId},
+          error
+        );
       }
       throw error;
     }
@@ -248,17 +293,16 @@ export class FirestoreService {
     documentId?: string,
     subCollection?: string
   ): Promise<Array<DocumentData>> {
-    logger.info([
-      'FirestoreService.getCollection()- getting collection from Firestore.',
-      {
-        collection: collection,
-        isSubCollection: isSubCollection,
-        documentId: documentId,
-        subCollection: subCollection,
-      },
-    ]);
+    const methodName = 'getCollection';
+    this.logMethodEntry(methodName, {
+      collection: collection,
+      isSubCollection: isSubCollection,
+      documentId: documentId,
+      subCollection: subCollection,
+    });
 
     try {
+      await this.ensureInitialized();
       const db = this.getDb();
       if (isSubCollection) {
         // Check documentId and subCollection are provided.
@@ -286,12 +330,16 @@ export class FirestoreService {
             subCollection
           );
         }
+        this.logMethodSuccess(methodName);
         return result;
       } else {
         const querySnapshot = await db.collection(collection).get();
+        this.logMethodSuccess(methodName);
         return querySnapshot.docs.map((doc) => doc.data());
       }
     } catch (error) {
+      this.logMethodError(methodName, error as Error);
+
       // If it's already our custom error, re-throw it
       if (error instanceof FirestoreServiceError) {
         throw error;
@@ -331,17 +379,16 @@ export class FirestoreService {
     data: Array<DocumentData>;
     refs: Array<DocumentReference>;
   }> {
-    logger.info([
-      'FirestoreService.getCollectionWithRefs()- getting collection from Firestore.',
-      {
-        collection: collection,
-        isSubCollection: isSubCollection,
-        documentId: documentId,
-        subCollection: subCollection,
-      },
-    ]);
+    const methodName = 'getCollectionWithRefs';
+    this.logMethodEntry(methodName, {
+      collection: collection,
+      isSubCollection: isSubCollection,
+      documentId: documentId,
+      subCollection: subCollection,
+    });
 
     try {
+      await this.ensureInitialized();
       const db = this.getDb();
       if (isSubCollection) {
         // Check documentId and subCollection are provided.
@@ -360,18 +407,22 @@ export class FirestoreService {
           .doc(documentId)
           .collection(subCollection)
           .get();
+        this.logMethodSuccess(methodName);
         return {
           data: querySnapshot.docs.map((doc) => doc.data()),
           refs: querySnapshot.docs.map((doc) => doc.ref),
         };
       } else {
         const querySnapshot = await db.collection(collection).get();
+        this.logMethodSuccess(methodName);
         return {
           data: querySnapshot.docs.map((doc) => doc.data()),
           refs: querySnapshot.docs.map((doc) => doc.ref),
         };
       }
     } catch (error) {
+      this.logMethodError(methodName, error as Error);
+
       // If it's already our custom error, re-throw it
       if (error instanceof FirestoreServiceError) {
         throw error;
@@ -408,21 +459,23 @@ export class FirestoreService {
       value: string | number | boolean | Timestamp;
     }[]
   ): Promise<Array<DocumentData>> {
-    logger.info([
-      'FirestoreService.queryCollection()- querying collection from Firestore.',
-      {
-        collection: collection,
-        filters: filters,
-      },
-    ]);
+    const methodName = 'queryCollection';
+    this.logMethodEntry(methodName, {
+      collection: collection,
+      filters: filters,
+    });
 
     try {
+      await this.ensureInitialized();
       const querySnapshot = await this.queryCollectionSnapshot(
         collection,
         filters
       );
+      this.logMethodSuccess(methodName);
       return querySnapshot.docs.map((doc) => doc.data());
     } catch (error) {
+      this.logMethodError(methodName, error as Error);
+
       // Transform Firestore errors to provide better context
       if (error instanceof Error) {
         if (error.message.includes('PERMISSION_DENIED')) {
@@ -457,15 +510,14 @@ export class FirestoreService {
       value: string | number | boolean | Timestamp;
     }[]
   ): Promise<QuerySnapshot<DocumentData>> {
-    logger.info([
-      'FirestoreService.queryCollectionSnapshot()- querying collection from Firestore.',
-      {
-        collection: collection,
-        filters: filters,
-      },
-    ]);
+    const methodName = 'queryCollectionSnapshot';
+    this.logMethodEntry(methodName, {
+      collection: collection,
+      filters: filters,
+    });
 
     try {
+      await this.ensureInitialized();
       const db = this.getDb();
       let query:
         | ReturnType<typeof db.collection>
@@ -476,8 +528,12 @@ export class FirestoreService {
         query = query.where(filter.field, filter.operator, filter.value);
       });
 
-      return await query.get();
+      const querySnapshot = await query.get();
+      this.logMethodSuccess(methodName);
+      return querySnapshot;
     } catch (error) {
+      this.logMethodError(methodName, error as Error);
+
       // If it's already our custom error, re-throw it
       if (error instanceof FirestoreServiceError) {
         throw error;
@@ -525,24 +581,26 @@ export class FirestoreService {
     data: Array<DocumentData>;
     refs: Array<DocumentReference>;
   }> {
-    logger.info([
-      'FirestoreService.queryCollectionWithRefs()- querying collection from Firestore.',
-      {
-        collection: collection,
-        filters: filters,
-      },
-    ]);
+    const methodName = 'queryCollectionWithRefs';
+    this.logMethodEntry(methodName, {
+      collection: collection,
+      filters: filters,
+    });
 
     try {
+      await this.ensureInitialized();
       const querySnapshot = await this.queryCollectionSnapshot(
         collection,
         filters
       );
+      this.logMethodSuccess(methodName);
       return {
         data: querySnapshot.docs.map((doc) => doc.data()),
         refs: querySnapshot.docs.map((doc) => doc.ref),
       };
     } catch (error) {
+      this.logMethodError(methodName, error as Error);
+
       // Transform Firestore errors to provide better context
       if (error instanceof Error) {
         if (error.message.includes('PERMISSION_DENIED')) {
@@ -555,30 +613,33 @@ export class FirestoreService {
         if (error.message.includes('INVALID_ARGUMENT')) {
           throw FirestoreServiceError.queryFailed(collection, filters, error);
         }
-        // Let other errors bubble up as they might be unexpected
-        throw error;
+        // For other unexpected errors, wrap them in a FirestoreServiceError
+        throw new FirestoreServiceError(
+          `Failed to query collection '${collection}' with refs`,
+          FirestoreErrorCode.QUERY_FAILED,
+          500,
+          {collection, filters},
+          error
+        );
       }
       throw error;
     }
   }
 
   public async runBatch(batch: (batch: WriteBatch) => Promise<void>) {
-    logger.info('FirestoreService.runBatch()- starting batch operation');
+    const methodName = 'runBatch';
+    this.logMethodEntry(methodName);
 
     try {
+      await this.ensureInitialized();
       const db = this.getDb();
       const writeBatch = db.batch();
 
       await batch(writeBatch);
       await writeBatch.commit();
-      logger.info(
-        'FirestoreService.runBatch()- batch operation completed successfully'
-      );
+      this.logMethodSuccess(methodName);
     } catch (error) {
-      logger.error(
-        'FirestoreService.runBatch()- batch operation failed',
-        error
-      );
+      this.logMethodError(methodName, error as Error);
 
       // Transform batch operation errors to provide better context
       if (error instanceof Error) {
@@ -595,8 +656,14 @@ export class FirestoreService {
             error
           );
         }
-        // Let other errors bubble up as they might be unexpected
-        throw error;
+        // For other unexpected errors, wrap them in a FirestoreServiceError
+        throw new FirestoreServiceError(
+          'Failed to execute batch operation',
+          FirestoreErrorCode.BATCH_OPERATION_FAILED,
+          500,
+          {},
+          error
+        );
       }
       throw error;
     }
@@ -698,20 +765,17 @@ export class FirestoreService {
   public async runTransaction<T>(
     updateFunction: (transaction: Transaction) => Promise<T>
   ): Promise<T> {
-    logger.info('FirestoreService.runTransaction()- starting transaction');
+    const methodName = 'runTransaction';
+    this.logMethodEntry(methodName);
 
     try {
+      await this.ensureInitialized();
       const db = this.getDb();
       const result = await db.runTransaction(updateFunction);
-      logger.info(
-        'FirestoreService.runTransaction()- transaction completed successfully'
-      );
+      this.logMethodSuccess(methodName);
       return result;
     } catch (error) {
-      logger.error(
-        'FirestoreService.runTransaction()- transaction failed',
-        error
-      );
+      this.logMethodError(methodName, error as Error);
 
       // Transform transaction errors to provide better context
       if (error instanceof Error) {
@@ -728,8 +792,14 @@ export class FirestoreService {
             error
           );
         }
-        // Let other errors bubble up as they might be unexpected
-        throw error;
+        // For other unexpected errors, wrap them in a FirestoreServiceError
+        throw new FirestoreServiceError(
+          'Failed to execute transaction',
+          FirestoreErrorCode.TRANSACTION_FAILED,
+          500,
+          {},
+          error
+        );
       }
       throw error;
     }
@@ -900,7 +970,8 @@ export class FirestoreService {
    * @param transaction - The transaction object
    * @param collection - The collection name
    * @param documentId - The document ID
-   * @returns Promise that resolves to the document snapshot
+   * @returns Promise that resolves to the document data
+   * @throws FirestoreServiceError if document is not found
    */
   public async getDocumentWithTransaction(
     transaction: Transaction,
@@ -908,7 +979,12 @@ export class FirestoreService {
     documentId: string
   ): Promise<DocumentData> {
     const docRef = this.getDocumentReference(collection, documentId);
-    return transaction.get(docRef);
+    const doc = await transaction.get(docRef);
+    const data = doc.data();
+    if (!data) {
+      throw FirestoreServiceError.documentNotFound(collection, documentId);
+    }
+    return data;
   }
 
   /**
