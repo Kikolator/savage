@@ -3,6 +3,7 @@ import {onRequest} from 'firebase-functions/v2/https';
 
 import {scheduledEvents} from './scheduled-events';
 import {STATIC_CONFIG, SECRET_REFERENCES} from './core/config';
+import {initializeContainer} from './core/services/di';
 import apiApp from './api';
 import {callableFunctions, trialdayMigrationFunctions} from './app-functions';
 import {initializeEventTriggers} from './event-triggers';
@@ -12,6 +13,9 @@ process.env.TZ = STATIC_CONFIG.timezone;
 
 // Initialize Firebase Admin
 initializeApp();
+
+// Initialize DI Container
+initializeContainer();
 
 // API app - using static config for deployment-safe values
 exports.api = onRequest(
