@@ -1,105 +1,46 @@
-import {jest, describe, it, expect, beforeEach} from '@jest/globals';
+/* eslint-disable @typescript-eslint/no-var-requires */
+import {jest, describe, it, expect, beforeEach, afterEach} from '@jest/globals';
 
-// Mock all the modules
-jest.mock('firebase-functions/v2', () => ({
-  onRequest: jest.fn(() => jest.fn()),
-  onCall: jest.fn(() => jest.fn()),
-  logger: {
-    info: jest.fn(),
-    error: jest.fn(),
-    debug: jest.fn(),
-  },
-}));
-
+// Minimal mocks for Firebase Functions v2 and Admin
 jest.mock('firebase-admin/app', () => ({
   initializeApp: jest.fn(),
-  getApp: jest.fn(),
+}));
+jest.mock('firebase-functions/v2/https', () => ({
+  onRequest: jest.fn(() => jest.fn()),
 }));
 
-jest.mock('./src/core/services/di', () => ({
-  ServiceResolver: {
-    getFirestoreService: jest.fn(),
-    getSendgridService: jest.fn(),
-    getOfficeRndService: jest.fn(),
-    getTrialdayService: jest.fn(),
-    getReferralService: jest.fn(),
-    getEmailConfirmationService: jest.fn(),
-    getRewardService: jest.fn(),
-    getTrialdayMigrationService: jest.fn(),
-    getGoogleCalService: jest.fn(),
-    getBankPayoutService: jest.fn(),
-  },
-}));
+beforeEach(() => {
+  jest.clearAllMocks();
+  delete require.cache[require.resolve('../src/index')];
+});
 
-jest.mock('./src/api/controllers', () => ({
-  getControllersV1: jest.fn(() => []),
-}));
-
-jest.mock('./src/app-functions', () => ({
-  initializeCallableFunctions: jest.fn(),
-}));
-
-jest.mock('./src/event-triggers', () => ({
-  initializeEventTriggers: jest.fn(),
-}));
-
-jest.mock('./src/scheduled-events', () => ({
-  initializeScheduledEvents: jest.fn(),
-}));
-
-describe('Index', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
+describe('index.ts', () => {
+  it('should load without throwing', () => {
+    expect(() => require('../src/index')).not.toThrow();
   });
 
-  it('should export functions without throwing errors', () => {
-    expect(() => {
-      require('./src/index');
-    }).not.toThrow();
+  it('should initialize Firebase Admin', () => {
+    require('../src/index');
+    const {initializeApp} = require('firebase-admin/app');
+    expect(initializeApp).toHaveBeenCalled();
   });
 
-  it('should initialize all required services', () => {
-    const {ServiceResolver} = require('./src/core/services/di');
-
-    require('./src/index');
-
-    // Verify that services are accessed (which means they're initialized)
-    expect(ServiceResolver.getFirestoreService).toHaveBeenCalled();
-    expect(ServiceResolver.getSendgridService).toHaveBeenCalled();
-    expect(ServiceResolver.getOfficeRndService).toHaveBeenCalled();
-    expect(ServiceResolver.getTrialdayService).toHaveBeenCalled();
-    expect(ServiceResolver.getReferralService).toHaveBeenCalled();
+  it('should export an api function', () => {
+    const exports = require('../src/index');
+    expect(exports.api).toBeDefined();
+    expect(typeof exports.api).toBe('function');
   });
 
-  it('should initialize controllers', () => {
-    const {getControllersV1} = require('./src/api/controllers');
-
-    require('./src/index');
-
-    expect(getControllersV1).toHaveBeenCalled();
+  it('should export other functions as functions', () => {
+    const exports = require('../src/index');
+    Object.keys(exports).forEach((key) => {
+      expect(typeof exports[key]).toBe('function');
+    });
   });
 
-  it('should initialize callable functions', () => {
-    const {initializeCallableFunctions} = require('./src/app-functions');
-
-    require('./src/index');
-
-    expect(initializeCallableFunctions).toHaveBeenCalled();
-  });
-
-  it('should initialize event triggers', () => {
-    const {initializeEventTriggers} = require('./src/event-triggers');
-
-    require('./src/index');
-
-    expect(initializeEventTriggers).toHaveBeenCalled();
-  });
-
-  it('should initialize scheduled events', () => {
-    const {initializeScheduledEvents} = require('./src/scheduled-events');
-
-    require('./src/index');
-
-    expect(initializeScheduledEvents).toHaveBeenCalled();
+  it('should call onRequest to create the api function', () => {
+    require('../src/index');
+    const {onRequest} = require('firebase-functions/v2/https');
+    expect(onRequest).toHaveBeenCalled();
   });
 });

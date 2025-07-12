@@ -2,32 +2,27 @@ import {initializeApp} from 'firebase-admin/app';
 import {onRequest} from 'firebase-functions/v2/https';
 
 import {scheduledEvents} from './scheduled-events';
-import {getConfig} from './core/config';
+import {STATIC_CONFIG, SECRET_REFERENCES} from './core/config';
 import apiApp from './api';
 import {callableFunctions, trialdayMigrationFunctions} from './app-functions';
-import {eventTriggers} from './event-triggers';
-import {initializeContainer} from './core/services/di';
+import {initializeEventTriggers} from './event-triggers';
 
 // Set timezone to UTC
-process.env.TZ = 'UTC';
+process.env.TZ = STATIC_CONFIG.timezone;
 
 // Initialize Firebase Admin
 initializeApp();
 
-// Initialize DI Container
-initializeContainer();
-
-// API app
-const config = getConfig();
+// API app - using static config for deployment-safe values
 exports.api = onRequest(
   {
-    region: config.firebase.region,
+    region: STATIC_CONFIG.region,
     secrets: [
-      config.firebase.secrets.typeformSecretKey,
-      config.firebase.secrets.officeRndSecretKey,
-      config.firebase.secrets.sendgridApiKey,
-      config.firebase.secrets.officeRndWebhookSecret,
-      config.firebase.secrets.savageSecret,
+      SECRET_REFERENCES.sendgridApiKey,
+      SECRET_REFERENCES.officeRndSecretKey,
+      SECRET_REFERENCES.typeformSecretKey,
+      SECRET_REFERENCES.officeRndWebhookSecret,
+      SECRET_REFERENCES.savageSecret,
     ],
   },
   apiApp
@@ -43,4 +38,4 @@ Object.assign(exports, callableFunctions());
 Object.assign(exports, trialdayMigrationFunctions);
 
 // Event Triggers
-Object.assign(exports, eventTriggers());
+Object.assign(exports, initializeEventTriggers());
