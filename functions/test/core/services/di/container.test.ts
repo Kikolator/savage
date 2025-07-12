@@ -1,6 +1,11 @@
-import {describe, it, expect, beforeEach, afterEach} from '@jest/globals';
+import {describe, it, expect, beforeEach, afterEach, jest} from '@jest/globals';
 
-import {DIContainer} from '../../../../src/core/services/di/container';
+import {
+  DIContainer,
+  initializeContainer,
+  container,
+  ServiceKeys,
+} from '../../../../src/core/services/di/container';
 
 // Test interfaces
 interface TestService {
@@ -294,5 +299,145 @@ describe('DIContainer', () => {
       expect(second.id).toBe(2);
       expect(third.id).toBe(3);
     });
+  });
+});
+
+describe('initializeContainer', () => {
+  beforeEach(() => {
+    // Clear the global container before each test
+    container.clear();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    // Clear the global container after each test
+    container.clear();
+  });
+
+  it('should register all required services', () => {
+    // Call initializeContainer
+    initializeContainer();
+
+    // Verify that all expected services are registered
+    expect(container.has(ServiceKeys.FIRESTORE)).toBe(true);
+    expect(container.has(ServiceKeys.SENDGRID)).toBe(true);
+    expect(container.has(ServiceKeys.OFFICE_RND)).toBe(true);
+    expect(container.has(ServiceKeys.BANK_PAYOUT)).toBe(true);
+    expect(container.has(ServiceKeys.EMAIL_CONFIRMATION)).toBe(true);
+    expect(container.has(ServiceKeys.REWARD)).toBe(true);
+    expect(container.has(ServiceKeys.REFERRAL)).toBe(true);
+    expect(container.has(ServiceKeys.TRIALDAY)).toBe(true);
+    expect(container.has(ServiceKeys.TRIALDAY_MIGRATION)).toBe(true);
+  });
+
+  it('should register services with correct types', () => {
+    // Call initializeContainer
+    initializeContainer();
+
+    // Verify that services can be resolved without throwing
+    expect(() => container.resolve(ServiceKeys.FIRESTORE)).not.toThrow();
+    expect(() => container.resolve(ServiceKeys.SENDGRID)).not.toThrow();
+    expect(() => container.resolve(ServiceKeys.OFFICE_RND)).not.toThrow();
+    expect(() => container.resolve(ServiceKeys.BANK_PAYOUT)).not.toThrow();
+    expect(() =>
+      container.resolve(ServiceKeys.EMAIL_CONFIRMATION)
+    ).not.toThrow();
+    expect(() => container.resolve(ServiceKeys.REWARD)).not.toThrow();
+    expect(() => container.resolve(ServiceKeys.REFERRAL)).not.toThrow();
+    expect(() => container.resolve(ServiceKeys.TRIALDAY)).not.toThrow();
+    expect(() =>
+      container.resolve(ServiceKeys.TRIALDAY_MIGRATION)
+    ).not.toThrow();
+  });
+
+  it('should register singleton services as singletons', () => {
+    // Call initializeContainer
+    initializeContainer();
+
+    // Verify that singleton services return the same instance
+    const firestore1 = container.resolve(ServiceKeys.FIRESTORE);
+    const firestore2 = container.resolve(ServiceKeys.FIRESTORE);
+    expect(firestore1).toBe(firestore2);
+
+    const sendgrid1 = container.resolve(ServiceKeys.SENDGRID);
+    const sendgrid2 = container.resolve(ServiceKeys.SENDGRID);
+    expect(sendgrid1).toBe(sendgrid2);
+
+    const officeRnd1 = container.resolve(ServiceKeys.OFFICE_RND);
+    const officeRnd2 = container.resolve(ServiceKeys.OFFICE_RND);
+    expect(officeRnd1).toBe(officeRnd2);
+
+    const bankPayout1 = container.resolve(ServiceKeys.BANK_PAYOUT);
+    const bankPayout2 = container.resolve(ServiceKeys.BANK_PAYOUT);
+    expect(bankPayout1).toBe(bankPayout2);
+
+    const trialday1 = container.resolve(ServiceKeys.TRIALDAY);
+    const trialday2 = container.resolve(ServiceKeys.TRIALDAY);
+    expect(trialday1).toBe(trialday2);
+  });
+
+  it('should register factory services as factories', () => {
+    // Call initializeContainer
+    initializeContainer();
+
+    // Verify that factory services return new instances each time
+    const emailConfirmation1 = container.resolve(
+      ServiceKeys.EMAIL_CONFIRMATION
+    );
+    const emailConfirmation2 = container.resolve(
+      ServiceKeys.EMAIL_CONFIRMATION
+    );
+    expect(emailConfirmation1).not.toBe(emailConfirmation2);
+
+    const reward1 = container.resolve(ServiceKeys.REWARD);
+    const reward2 = container.resolve(ServiceKeys.REWARD);
+    expect(reward1).not.toBe(reward2);
+
+    const referral1 = container.resolve(ServiceKeys.REFERRAL);
+    const referral2 = container.resolve(ServiceKeys.REFERRAL);
+    expect(referral1).not.toBe(referral2);
+
+    const trialdayMigration1 = container.resolve(
+      ServiceKeys.TRIALDAY_MIGRATION
+    );
+    const trialdayMigration2 = container.resolve(
+      ServiceKeys.TRIALDAY_MIGRATION
+    );
+    expect(trialdayMigration1).not.toBe(trialdayMigration2);
+  });
+
+  it('should handle dependencies correctly', () => {
+    // Call initializeContainer
+    initializeContainer();
+
+    // Verify that services with dependencies can be resolved
+    // This tests that the dependency injection is working correctly
+    expect(() => {
+      const referralService = container.resolve(ServiceKeys.REFERRAL);
+      expect(referralService).toBeDefined();
+    }).not.toThrow();
+
+    expect(() => {
+      const trialdayService = container.resolve(ServiceKeys.TRIALDAY);
+      expect(trialdayService).toBeDefined();
+    }).not.toThrow();
+
+    expect(() => {
+      const trialdayMigrationService = container.resolve(
+        ServiceKeys.TRIALDAY_MIGRATION
+      );
+      expect(trialdayMigrationService).toBeDefined();
+    }).not.toThrow();
+  });
+
+  it('should not throw when called multiple times', () => {
+    // Call initializeContainer multiple times
+    expect(() => initializeContainer()).not.toThrow();
+    expect(() => initializeContainer()).not.toThrow();
+    expect(() => initializeContainer()).not.toThrow();
+
+    // Verify that services are still available
+    expect(container.has(ServiceKeys.FIRESTORE)).toBe(true);
+    expect(container.has(ServiceKeys.TRIALDAY)).toBe(true);
   });
 });

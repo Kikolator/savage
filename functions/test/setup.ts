@@ -9,10 +9,43 @@ jest.mock('firebase-functions', () => ({
     debug: jest.fn(),
   },
   onRequest: jest.fn(),
-  onCall: jest.fn(),
+  onCall: jest.fn((options, handler) => handler), // Return the handler function directly
   defineSecret: jest.fn(() => ({
     value: jest.fn(() => 'mock-secret-value'),
   })),
+}));
+
+// Mock Firebase Functions v2
+jest.mock('firebase-functions/v2', () => ({
+  logger: {
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn(),
+  },
+  onCall: jest.fn((options, handler) => handler), // Return the handler function directly
+  https: {
+    onCall: jest.fn((options, handler) => handler), // Return the handler function directly
+  },
+}));
+
+// Mock Firebase Functions v2/scheduler
+jest.mock('firebase-functions/v2/scheduler', () => ({
+  onSchedule: jest.fn((options, handler) => handler), // Return the handler function directly
+}));
+
+// Mock Firebase Functions v2/https
+jest.mock('firebase-functions/v2/https', () => ({
+  HttpsError: class HttpsError extends Error {
+    constructor(
+      public code: string,
+      public message: string
+    ) {
+      super(message);
+      this.code = code;
+    }
+  },
+  onCall: jest.fn((options, handler) => handler), // Return the handler function directly
 }));
 
 // Mock Firebase Admin

@@ -54,22 +54,22 @@ export const createMockCallableResponse = () => ({
 });
 
 // Enhanced Firestore mocks for correct structure
-export const mockFirestoreDocument = (data: any = {}) => {
-  // For subcollection access, .collection returns a mock collection
-  const mockCollection = (subCollectionName: string) => ({
-    get: jest.fn().mockResolvedValue(mockFirestoreQuerySnapshot([])),
-    // You can extend this to allow custom docs for subcollections if needed
-  });
-  return {
-    exists: true,
-    data: () => data,
+export const mockFirestoreDocument = (data: any = {}) => ({
+  exists: true,
+  data: () => data,
+  id: 'test-doc-id',
+  ref: {
     id: 'test-doc-id',
-    ref: {
-      id: 'test-doc-id',
-    },
-    collection: jest.fn(mockCollection),
-  };
-};
+  },
+  collection: jest.fn(() => ({
+    get: jest.fn().mockResolvedValue({
+      empty: true,
+      size: 0,
+      docs: [],
+      forEach: jest.fn(),
+    }),
+  })),
+});
 
 export const mockFirestoreQuerySnapshot = (docs: any[] = []) => ({
   empty: docs.length === 0,
@@ -79,9 +79,13 @@ export const mockFirestoreQuerySnapshot = (docs: any[] = []) => ({
     data: () => doc,
     id: `doc-${index}`,
     ref: {id: `doc-${index}`},
-    // For subcollection access in tests
     collection: jest.fn(() => ({
-      get: jest.fn().mockResolvedValue(mockFirestoreQuerySnapshot([])),
+      get: jest.fn().mockResolvedValue({
+        empty: true,
+        size: 0,
+        docs: [],
+        forEach: jest.fn(),
+      }),
     })),
   })),
   forEach: jest.fn((callback: any) => {
@@ -92,7 +96,12 @@ export const mockFirestoreQuerySnapshot = (docs: any[] = []) => ({
         id: `doc-${index}`,
         ref: {id: `doc-${index}`},
         collection: jest.fn(() => ({
-          get: jest.fn().mockResolvedValue(mockFirestoreQuerySnapshot([])),
+          get: jest.fn().mockResolvedValue({
+            empty: true,
+            size: 0,
+            docs: [],
+            forEach: jest.fn(),
+          }),
         })),
       });
     });
@@ -100,7 +109,7 @@ export const mockFirestoreQuerySnapshot = (docs: any[] = []) => ({
 });
 
 // Helper to create a mock collection with .get, .where, and .doc
-export const createMockCollection = (docs: any[] = []) => {
+export const createMockCollection = (docs: any[] = []): any => {
   const querySnapshot = mockFirestoreQuerySnapshot(docs);
   return {
     get: jest.fn().mockResolvedValue(querySnapshot),
@@ -112,7 +121,12 @@ export const createMockCollection = (docs: any[] = []) => {
       mockFirestoreDocument(docs.find((d) => d.id === id) || {})
     ),
     collection: jest.fn(() => ({
-      get: jest.fn().mockResolvedValue(mockFirestoreQuerySnapshot([])),
+      get: jest.fn().mockResolvedValue({
+        empty: true,
+        size: 0,
+        docs: [],
+        forEach: jest.fn(),
+      }),
     })),
   };
 };

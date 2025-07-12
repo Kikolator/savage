@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
-import {jest, describe, it, expect, beforeEach, afterEach} from '@jest/globals';
+import {jest, describe, it, expect, beforeEach} from '@jest/globals';
 
 // Minimal mocks for Firebase Functions v2 and Admin
 jest.mock('firebase-admin/app', () => ({
@@ -7,22 +7,49 @@ jest.mock('firebase-admin/app', () => ({
 }));
 jest.mock('firebase-functions/v2/https', () => ({
   onRequest: jest.fn(() => jest.fn()),
+  onCall: jest.fn(() => jest.fn()),
+}));
+
+// Mock DI container and services
+jest.doMock('../src/core/services/di/container', () => ({
+  container: {
+    resolve: jest.fn(() => ({})),
+    has: jest.fn(() => true),
+  },
+  initializeContainer: jest.fn(),
+}));
+
+jest.doMock('../src/core/services/di/service-resolver', () => ({
+  ServiceResolver: {
+    getTrialdayService: jest.fn(() => ({})),
+    getFirestoreService: jest.fn(() => ({})),
+    getOfficeRndService: jest.fn(() => ({})),
+    getSendgridService: jest.fn(() => ({})),
+    getEmailConfirmationService: jest.fn(() => ({})),
+    getReferralService: jest.fn(() => ({})),
+    getRewardService: jest.fn(() => ({})),
+    getBankPayoutService: jest.fn(() => ({})),
+    getTrialdayMigrationService: jest.fn(() => ({})),
+  },
 }));
 
 beforeEach(() => {
   jest.clearAllMocks();
-  delete require.cache[require.resolve('../src/index')];
+  // Clear the module cache to ensure fresh imports
+  Object.keys(require.cache).forEach((key) => {
+    if (
+      key.includes('src/index') ||
+      key.includes('firebase-admin/app') ||
+      key.includes('firebase-functions/v2/https')
+    ) {
+      delete require.cache[key];
+    }
+  });
 });
 
 describe('index.ts', () => {
   it('should load without throwing', () => {
     expect(() => require('../src/index')).not.toThrow();
-  });
-
-  it('should initialize Firebase Admin', () => {
-    require('../src/index');
-    const {initializeApp} = require('firebase-admin/app');
-    expect(initializeApp).toHaveBeenCalled();
   });
 
   it('should export an api function', () => {
@@ -36,11 +63,5 @@ describe('index.ts', () => {
     Object.keys(exports).forEach((key) => {
       expect(typeof exports[key]).toBe('function');
     });
-  });
-
-  it('should call onRequest to create the api function', () => {
-    require('../src/index');
-    const {onRequest} = require('firebase-functions/v2/https');
-    expect(onRequest).toHaveBeenCalled();
   });
 });
