@@ -1,18 +1,10 @@
 import OfficeRndService from '../../../src/core/services/office-rnd-service';
-import {FirestoreService} from '../../../src/core/services/firestore-service';
 import {OfficeRnDServiceError} from '../../../src/core/errors/services/office-rnd-service-error';
 import {
   FirestoreServiceError,
   FirestoreErrorCode,
 } from '../../../src/core/errors';
-import {OfficeRndMemberStatus} from '../../../src/core/data/enums/office-rnd/office-rnd-member-status';
-import {
-  OfficeRndMember,
-  OfficeRndCompany,
-  OfficeRndOpportunity,
-  OfficeRndOpportunityStatus,
-  OfficeRndTokenResponse,
-} from '../../../src/core/data/models';
+import {OfficeRndTokenResponse} from '../../../src/core/data/models';
 
 // Mock config
 jest.mock('../../../src/core/config', () => ({

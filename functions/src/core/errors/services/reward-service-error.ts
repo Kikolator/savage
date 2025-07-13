@@ -1,4 +1,4 @@
-import {AppError, ErrorCode} from '../app-error';
+import {AppError} from '../app-error';
 
 export enum RewardServiceErrorCode {
   INVALID_REFERRAL_STATUS = 'INVALID_REFERRAL_STATUS',
@@ -13,6 +13,7 @@ export enum RewardServiceErrorCode {
 
 export class RewardServiceError extends AppError {
   public readonly serviceCode: RewardServiceErrorCode;
+  public readonly code: number;
 
   constructor(
     message: string,
@@ -21,9 +22,10 @@ export class RewardServiceError extends AppError {
     details?: any,
     cause?: Error
   ) {
-    super(message, ErrorCode.INVALID_ARGUMENT, status, details, cause);
+    super(message, status, details, cause);
     this.name = 'RewardServiceError';
     this.serviceCode = serviceCode;
+    this.code = 9400; // REWARD_SERVICE_ERROR
   }
 
   static invalidReferralStatus(referralId: string, currentStatus: string) {

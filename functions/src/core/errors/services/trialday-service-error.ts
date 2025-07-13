@@ -1,4 +1,4 @@
-import {AppError, ErrorCode} from '../app-error';
+import {AppError} from '../app-error';
 
 /**
  * Specific error codes for TrialdayService operations
@@ -50,6 +50,7 @@ export enum TrialdayServiceErrorCode {
  */
 export class TrialdayServiceError extends AppError {
   public readonly serviceCode: TrialdayServiceErrorCode;
+  public readonly code: number;
 
   constructor(
     message: string,
@@ -58,12 +59,13 @@ export class TrialdayServiceError extends AppError {
     method?: string,
     data?: unknown
   ) {
-    super(message, ErrorCode.TRIALDAY_SERVICE_ERROR, statusCode, {
+    super(message, statusCode, {
       method,
       data,
       serviceCode,
     });
     this.serviceCode = serviceCode;
+    this.code = 9600; // TRIALDAY_SERVICE_ERROR
   }
 
   // Factory methods for common error scenarios

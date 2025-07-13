@@ -1,3 +1,6 @@
+/**
+ * @deprecated Use specific error codes in child classes instead
+ */
 export enum ErrorCode {
   // Generic errors (1000-1999)
   UNKNOWN_ERROR = 1000,
@@ -9,12 +12,6 @@ export enum ErrorCode {
 
   // Google Calendar Service errors (5000-5999)
   GOOGLECAL_EVENT_CREATION_FAILED = 5000,
-
-  // Typeform Controller errors (6000-6999)
-  TYPEFORM_WEBHOOK_INVALID_SIGNATURE = 6000,
-  TYPEFORM_WEBHOOK_INVALID_DATA = 6001,
-  TYPEFORM_WEBHOOK_NO_HANDLER_FOUND = 6002,
-  TYPEFORM_WEBHOOK_NO_RAW_BODY = 6003,
 }
 
 /**
@@ -22,19 +19,12 @@ export enum ErrorCode {
  * Provides consistent error handling with proper error chaining and context.
  */
 export class AppError extends Error {
-  public readonly code: ErrorCode;
   public readonly status: number;
   public readonly details?: unknown;
   public readonly timestamp: Date;
   public readonly cause?: Error;
 
-  constructor(
-    message: string,
-    code: ErrorCode = ErrorCode.UNKNOWN_ERROR,
-    status = 500,
-    details?: unknown,
-    cause?: Error
-  ) {
+  constructor(message: string, status = 500, details?: unknown, cause?: Error) {
     // Ensure proper error inheritance
     super(message);
 
@@ -42,7 +32,6 @@ export class AppError extends Error {
     this.name = this.constructor.name;
 
     // Set properties
-    this.code = code;
     this.status = status;
     this.details = details;
     this.timestamp = new Date();
@@ -62,7 +51,6 @@ export class AppError extends Error {
     return {
       name: this.name,
       message: this.message,
-      code: this.code,
       status: this.status,
       details: this.details,
       timestamp: this.timestamp.toISOString(),
@@ -86,7 +74,6 @@ export class AppError extends Error {
     return {
       name: this.name,
       message: this.message,
-      code: this.code,
       status: this.status,
       details: this.details,
       timestamp: this.timestamp.toISOString(),
@@ -117,13 +104,7 @@ export class AppError extends Error {
       ...((additionalDetails as Record<string, unknown>) || {}),
     };
 
-    return new AppError(
-      this.message,
-      this.code,
-      this.status,
-      combinedDetails,
-      this
-    );
+    return new AppError(this.message, this.status, combinedDetails, this);
   }
 
   /**
@@ -133,7 +114,7 @@ export class AppError extends Error {
    * @returns New error instance with the updated message
    */
   public withMessage(newMessage: string): AppError {
-    return new AppError(newMessage, this.code, this.status, this.details, this);
+    return new AppError(newMessage, this.status, this.details, this);
   }
 
   /**

@@ -1,5 +1,4 @@
 import {jest, describe, it, expect, beforeEach, afterEach} from '@jest/globals';
-import {logger} from 'firebase-functions/v2';
 
 import {OfficeRndMemberEvents} from '../../src/event-triggers/by-document/office-rnd-member-events';
 import {

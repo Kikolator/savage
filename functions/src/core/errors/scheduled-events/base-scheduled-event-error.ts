@@ -1,10 +1,12 @@
-import {AppError, ErrorCode} from '../app-error';
+import {AppError} from '../app-error';
 
 /**
  * Base error class for scheduled events.
  * Scheduled events don't return HTTP responses, so we don't need status codes.
  */
 export abstract class BaseScheduledEventError extends AppError {
+  public readonly code: number;
+
   constructor(
     message: string,
     localErrorCode: number,
@@ -19,9 +21,8 @@ export abstract class BaseScheduledEventError extends AppError {
       ...details,
     };
 
-    // Cast local error code to global ErrorCode for compatibility
-    // TODO: Remove this cast when AppError is updated to support local error codes
-    super(message, localErrorCode as unknown as ErrorCode, 0, errorDetails);
+    super(message, 0, errorDetails);
+    this.code = localErrorCode;
   }
 
   /**

@@ -1,4 +1,4 @@
-import {AppError, ErrorCode} from '../app-error';
+import {AppError} from '../app-error';
 
 /**
  * FirestoreService-specific error codes.
@@ -24,15 +24,18 @@ export enum FirestoreErrorCode {
  * Provides specific error handling for Firestore-related operations.
  */
 export class FirestoreServiceError extends AppError {
+  public readonly code: number;
+
   constructor(
     message: string,
-    code: FirestoreErrorCode | ErrorCode = ErrorCode.UNKNOWN_ERROR,
+    code: FirestoreErrorCode = FirestoreErrorCode.DOCUMENT_NOT_FOUND,
     status = 500,
     details?: unknown,
     cause?: Error
   ) {
-    super(message, code as ErrorCode, status, details, cause);
+    super(message, status, details, cause);
     this.name = 'FirestoreServiceError';
+    this.code = code;
   }
 
   /**
@@ -231,7 +234,7 @@ export class FirestoreServiceError extends AppError {
   ): FirestoreServiceError {
     return new FirestoreServiceError(
       message,
-      ErrorCode.VALIDATION_ERROR,
+      FirestoreErrorCode.INVALID_DOCUMENT_DATA,
       400,
       details
     );

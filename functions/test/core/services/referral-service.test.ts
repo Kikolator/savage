@@ -66,18 +66,6 @@ describe('ReferralService', () => {
       },
     };
 
-    const mockReferralCode = new ReferralCode({
-      documentId: 'test-referrer-id',
-      code: 'ABC123',
-      ownerId: 'test-referrer-id',
-      companyId: 'test-company-id',
-      ownerType: ReferrerType.MEMBER,
-      totalReferred: 0,
-      totalConverted: 0,
-      totalRewardedEur: 0,
-      referredUsers: [],
-    });
-
     it('should create referral code successfully', async () => {
       mockOfficeRndService.getMember.mockResolvedValue(mockReferrer);
       mockFirestoreService.createDocument.mockResolvedValue(undefined);

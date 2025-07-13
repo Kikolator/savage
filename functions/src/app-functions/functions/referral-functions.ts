@@ -10,7 +10,11 @@ import {STATIC_CONFIG} from '../../core/config';
 import {CreateReferralCodeCallData} from '../../core/data/models/referral-code/create-referral-code-call-data';
 import {ServiceResolver} from '../../core/services/di';
 import {ReferrerType} from '../../core/data/enums';
-import {AppError, ErrorCode} from '../../core/errors/app-error';
+import {AppError} from '../../core/errors/app-error';
+import {
+  ReferralServiceError,
+  ReferralServiceErrorCode,
+} from '../../core/errors/services/referral-service-error';
 
 export class ReferralFunctions implements InitializeCallableFunctions {
   initialize(add: AddCallableFunction): void {
@@ -46,14 +50,16 @@ export class ReferralFunctions implements InitializeCallableFunctions {
           return referralCode;
         } catch (error) {
           logger.error('Error creating referral code', error);
-          if (error instanceof AppError) {
-            if (error.code === ErrorCode.REFERRAL_CODE_ALREADY_EXISTS) {
+          if (error instanceof ReferralServiceError) {
+            if (error.serviceCode === ReferralServiceErrorCode.ALREADY_EXISTS) {
               throw new HttpsError(
                 'already-exists',
                 'Referral code already exists ' +
                   'for the user, so you cannot create a new one.'
               );
-            } else if (error.code === ErrorCode.REFERRAL_CODE_NO_PERMISSION) {
+            } else if (
+              error.serviceCode === ReferralServiceErrorCode.NO_PERMISSION
+            ) {
               throw new HttpsError(
                 'permission-denied',
                 'User does not have permission to create a referral code.'
@@ -66,6 +72,12 @@ export class ReferralFunctions implements InitializeCallableFunctions {
                   ` Code: ${error.code}`
               );
             }
+          } else if (error instanceof AppError) {
+            throw new HttpsError(
+              'unknown',
+              'Error creating referral code',
+              `Error creating referral code: ${error.message}`
+            );
           } else {
             throw new HttpsError(
               'unknown',

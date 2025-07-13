@@ -1,4 +1,4 @@
-import {AppError, ErrorCode} from '../app-error';
+import {AppError} from '../app-error';
 
 export enum ReferralServiceErrorCode {
   NO_PERMISSION = 'NO_PERMISSION',
@@ -17,6 +17,7 @@ export enum ReferralServiceErrorCode {
 
 export class ReferralServiceError extends AppError {
   public readonly serviceCode: ReferralServiceErrorCode;
+  public readonly code: number;
 
   constructor(
     message: string,
@@ -25,9 +26,10 @@ export class ReferralServiceError extends AppError {
     details?: any,
     cause?: Error
   ) {
-    super(message, ErrorCode.INVALID_ARGUMENT, status, details, cause);
+    super(message, status, details, cause);
     this.name = 'ReferralServiceError';
     this.serviceCode = serviceCode;
+    this.code = 9300; // REFERRAL_SERVICE_ERROR
   }
 
   static noPermission() {

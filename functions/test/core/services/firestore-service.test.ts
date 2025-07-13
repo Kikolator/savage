@@ -2,25 +2,24 @@ import {jest, describe, it, expect, beforeEach, afterEach} from '@jest/globals';
 import {
   getFirestore,
   FieldValue,
-  WhereFilterOp,
-  Transaction,
   WriteBatch,
-  DocumentReference,
-  QuerySnapshot,
-  DocumentData,
-  Timestamp,
+  Transaction,
 } from 'firebase-admin/firestore';
 
 import {FirestoreService} from '../../../src/core/services/firestore-service';
-import {AppError, ErrorCode} from '../../../src/core/errors/app-error';
 import {
   FirestoreServiceError,
   FirestoreErrorCode,
 } from '../../../src/core/errors';
 import {CreateDoc, SetDoc, UpdateDoc} from '../../../src/core/data/models';
 import {
-  mockFirestoreQuerySnapshot,
-  mockFirestoreDocument,
+  createMockDocumentReference,
+  createMockDocumentSnapshot,
+  createMockQuerySnapshot,
+  createMockCollectionReference,
+  createMockQuery,
+  createMockWriteBatch,
+  createMockTransaction,
   createMockCollection,
 } from '../../utils/test-helpers';
 
@@ -45,45 +44,17 @@ describe('FirestoreService', () => {
     // Reset singleton instance
     (FirestoreService as any).instance = null;
 
-    // Create simple mocks following Firebase best practices
-    mockDoc = {
-      get: jest.fn(),
-      set: jest.fn(),
-      update: jest.fn(),
-      create: jest.fn(),
-      delete: jest.fn(),
-      ref: {
-        id: 'test-doc-id',
-      },
-      collection: jest.fn(() => createMockCollection()),
-    };
+    // Create mocks using the enhanced test helpers
+    mockDoc = createMockDocumentReference();
+    mockQuery = createMockQuery();
+    mockCollection = createMockCollectionReference();
+    mockBatch = createMockWriteBatch();
+    mockTransaction = createMockTransaction();
 
-    mockQuery = {
-      where: jest.fn().mockReturnThis(),
-      get: jest.fn(),
-    };
-
-    mockCollection = {
-      doc: jest.fn(() => mockDoc),
-      get: jest.fn(),
-      where: jest.fn(() => mockQuery),
-    };
-
-    mockBatch = {
-      set: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-      create: jest.fn(),
-      commit: jest.fn(),
-    };
-
-    mockTransaction = {
-      get: jest.fn(),
-      set: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-      create: jest.fn(),
-    };
+    // Setup mock implementations
+    (mockCollection.doc as any).mockReturnValue(mockDoc);
+    (mockCollection.where as any).mockReturnValue(mockQuery);
+    (mockCollection.get as any).mockResolvedValue(createMockQuerySnapshot());
 
     mockDb = {
       collection: jest.fn(() => mockCollection),
@@ -93,16 +64,16 @@ describe('FirestoreService', () => {
 
     mockGetFirestore.mockReturnValue(mockDb);
 
-    // Mock FieldValue methods with simple return values
+    // Mock FieldValue methods with proper typing
     mockFieldValue.serverTimestamp = jest.fn(() => 'mock-timestamp' as any);
     mockFieldValue.increment = jest.fn(
       (value: number) => `increment-${value}` as any
     );
     mockFieldValue.arrayUnion = jest.fn(
-      (...elements: any[]) => `arrayUnion-${elements.length}` as any
+      (...elements) => `arrayUnion-${elements.length}` as any
     );
     mockFieldValue.arrayRemove = jest.fn(
-      (...elements: any[]) => `arrayRemove-${elements.length}` as any
+      (...elements) => `arrayRemove-${elements.length}` as any
     );
 
     firestoreService = FirestoreService.getInstance();
@@ -175,7 +146,7 @@ describe('FirestoreService', () => {
 
     it('should throw FirestoreServiceError when document already exists', async () => {
       const error = new Error('Document already exists: ALREADY_EXISTS');
-      mockDoc.create.mockRejectedValue(error);
+      (mockDoc.create as any).mockRejectedValue(error);
 
       await expect(
         firestoreService.createDocument(createDocData)
@@ -192,7 +163,7 @@ describe('FirestoreService', () => {
 
     it('should throw FirestoreServiceError when permission denied', async () => {
       const error = new Error('Permission denied: PERMISSION_DENIED');
-      mockDoc.create.mockRejectedValue(error);
+      (mockDoc.create as any).mockRejectedValue(error);
 
       await expect(
         firestoreService.createDocument(createDocData)
@@ -209,7 +180,7 @@ describe('FirestoreService', () => {
 
     it('should wrap unexpected errors in FirestoreServiceError', async () => {
       const unexpectedError = new Error('Network error');
-      mockDoc.create.mockRejectedValue(unexpectedError);
+      (mockDoc.create as any).mockRejectedValue(unexpectedError);
 
       await expect(
         firestoreService.createDocument(createDocData)
@@ -246,7 +217,7 @@ describe('FirestoreService', () => {
 
     it('should throw FirestoreServiceError when document not found', async () => {
       const error = new Error('Document not found: NOT_FOUND');
-      mockDoc.update.mockRejectedValue(error);
+      (mockDoc.update as any).mockRejectedValue(error);
 
       await expect(
         firestoreService.updateDocument(updateDocData)
@@ -263,7 +234,7 @@ describe('FirestoreService', () => {
 
     it('should throw FirestoreServiceError when permission denied', async () => {
       const error = new Error('Permission denied: PERMISSION_DENIED');
-      mockDoc.update.mockRejectedValue(error);
+      (mockDoc.update as any).mockRejectedValue(error);
 
       await expect(
         firestoreService.updateDocument(updateDocData)
@@ -330,7 +301,7 @@ describe('FirestoreService', () => {
 
     it('should throw FirestoreServiceError when permission denied', async () => {
       const error = new Error('Permission denied: PERMISSION_DENIED');
-      mockDoc.set.mockRejectedValue(error);
+      (mockDoc.set as any).mockRejectedValue(error);
 
       await expect(firestoreService.setDocument(setDocData)).rejects.toThrow(
         FirestoreServiceError
@@ -349,7 +320,8 @@ describe('FirestoreService', () => {
   describe('getDocument', () => {
     it('should return document data when document exists', async () => {
       const mockData = {name: 'test', value: 123};
-      mockDoc.get.mockResolvedValue(mockFirestoreDocument(mockData));
+      const mockDocSnapshot = createMockDocumentSnapshot(mockData);
+      (mockDoc.get as any).mockResolvedValue(mockDocSnapshot);
 
       const result = await firestoreService.getDocument(
         'test-collection',
@@ -363,12 +335,8 @@ describe('FirestoreService', () => {
     });
 
     it('should throw FirestoreServiceError when document does not exist', async () => {
-      mockDoc.get.mockResolvedValue({
-        exists: false,
-        data: () => null,
-        id: 'test-doc-id',
-        ref: {id: 'test-doc-id'},
-      });
+      const mockDocSnapshot = createMockDocumentSnapshot({}, false);
+      (mockDoc.get as any).mockResolvedValue(mockDocSnapshot);
 
       await expect(
         firestoreService.getDocument('test-collection', 'test-id')
@@ -385,7 +353,7 @@ describe('FirestoreService', () => {
 
     it('should throw FirestoreServiceError when permission denied', async () => {
       const error = new Error('Permission denied: PERMISSION_DENIED');
-      mockDoc.get.mockRejectedValue(error);
+      (mockDoc.get as any).mockRejectedValue(error);
 
       await expect(
         firestoreService.getDocument('test-collection', 'test-id')
@@ -405,7 +373,7 @@ describe('FirestoreService', () => {
         'test-collection',
         'test-id'
       );
-      mockDoc.get.mockRejectedValue(customError);
+      (mockDoc.get as any).mockRejectedValue(customError);
 
       await expect(
         firestoreService.getDocument('test-collection', 'test-id')
@@ -419,11 +387,13 @@ describe('FirestoreService', () => {
 
   describe('getCollection', () => {
     it('should return collection data for main collection', async () => {
-      const mockDocs = [{name: 'test1'}, {name: 'test2'}];
+      const mockDocs = [
+        createMockDocumentSnapshot({name: 'test1'}, true, 'doc1'),
+        createMockDocumentSnapshot({name: 'test2'}, true, 'doc2'),
+      ];
+      const mockQuerySnapshot = createMockQuerySnapshot(mockDocs);
 
-      mockCollection.get.mockResolvedValue(
-        mockFirestoreQuerySnapshot(mockDocs)
-      );
+      (mockCollection.get as any).mockResolvedValue(mockQuerySnapshot);
 
       const result = await firestoreService.getCollection('test-collection');
 
@@ -434,13 +404,18 @@ describe('FirestoreService', () => {
     });
 
     it('should return subcollection data when isSubCollection is true', async () => {
-      const mockDocs = [{name: 'test1'}];
+      const mockDocs = [
+        createMockDocumentSnapshot({name: 'test1'}, true, 'doc1'),
+      ];
+      const mockQuerySnapshot = createMockQuerySnapshot(mockDocs);
 
       // Mock the subcollection
-      const mockSubCollection = createMockCollection(mockDocs);
-      mockCollection.doc.mockReturnValue({
+      const mockSubCollection = createMockCollection();
+      (mockSubCollection.get as any).mockResolvedValue(mockQuerySnapshot);
+
+      (mockCollection.doc as any).mockReturnValue({
         collection: jest.fn(() => mockSubCollection),
-      });
+      } as any);
 
       const result = await firestoreService.getCollection(
         'parent-collection',
@@ -465,17 +440,20 @@ describe('FirestoreService', () => {
         message: expect.stringContaining(
           'documentId and subCollection are required'
         ),
-        code: ErrorCode.VALIDATION_ERROR,
+        code: FirestoreErrorCode.INVALID_DOCUMENT_DATA,
         status: 400,
       });
     });
 
     it('should throw FirestoreServiceError when collection is empty', async () => {
       // Mock the subcollection with empty results
-      const mockSubCollection = createMockCollection([]);
-      mockCollection.doc.mockReturnValue({
+      const mockSubCollection = createMockCollection();
+      const emptyQuerySnapshot = createMockQuerySnapshot([]);
+      (mockSubCollection.get as any).mockResolvedValue(emptyQuerySnapshot);
+
+      (mockCollection.doc as any).mockReturnValue({
         collection: jest.fn(() => mockSubCollection),
-      });
+      } as any);
 
       await expect(
         firestoreService.getCollection(
@@ -492,7 +470,7 @@ describe('FirestoreService', () => {
 
     it('should throw FirestoreServiceError when permission denied', async () => {
       const error = new Error('Permission denied: PERMISSION_DENIED');
-      mockCollection.get.mockRejectedValue(error);
+      (mockCollection.get as any).mockRejectedValue(error);
 
       await expect(
         firestoreService.getCollection('test-collection')
@@ -510,11 +488,13 @@ describe('FirestoreService', () => {
 
   describe('getCollectionWithRefs', () => {
     it('should return collection data with references', async () => {
-      const mockDocs = [{name: 'test1'}, {name: 'test2'}];
+      const mockDocs = [
+        createMockDocumentSnapshot({name: 'test1'}, true, 'doc1'),
+        createMockDocumentSnapshot({name: 'test2'}, true, 'doc2'),
+      ];
+      const mockQuerySnapshot = createMockQuerySnapshot(mockDocs);
 
-      mockCollection.get.mockResolvedValue(
-        mockFirestoreQuerySnapshot(mockDocs)
-      );
+      (mockCollection.get as any).mockResolvedValue(mockQuerySnapshot);
 
       const result =
         await firestoreService.getCollectionWithRefs('test-collection');
@@ -527,13 +507,18 @@ describe('FirestoreService', () => {
     });
 
     it('should handle subcollections with references', async () => {
-      const mockDocs = [{name: 'test1'}];
+      const mockDocs = [
+        createMockDocumentSnapshot({name: 'test1'}, true, 'doc1'),
+      ];
+      const mockQuerySnapshot = createMockQuerySnapshot(mockDocs);
 
       // Mock the subcollection
-      const mockSubCollection = createMockCollection(mockDocs);
-      mockCollection.doc.mockReturnValue({
+      const mockSubCollection = createMockCollection();
+      (mockSubCollection.get as any).mockResolvedValue(mockQuerySnapshot);
+
+      (mockCollection.doc as any).mockReturnValue({
         collection: jest.fn(() => mockSubCollection),
-      });
+      } as any);
 
       const result = await firestoreService.getCollectionWithRefs(
         'parent-collection',
@@ -554,7 +539,7 @@ describe('FirestoreService', () => {
 
     it('should throw FirestoreServiceError when permission denied', async () => {
       const error = new Error('Permission denied: PERMISSION_DENIED');
-      mockCollection.get.mockRejectedValue(error);
+      (mockCollection.get as any).mockRejectedValue(error);
 
       await expect(
         firestoreService.getCollectionWithRefs('test-collection')
@@ -568,23 +553,25 @@ describe('FirestoreService', () => {
 
   describe('queryCollection', () => {
     const filters = [
-      {field: 'active', operator: '==' as WhereFilterOp, value: true},
+      {field: 'active', operator: '==' as any, value: true},
       {
         field: 'category',
-        operator: 'in' as WhereFilterOp,
+        operator: 'in' as any,
         value: ['A', 'B'] as any,
       },
     ];
 
     it('should query collection with filters', async () => {
       const mockDocs = [
-        {
-          id: 'doc1',
-          data: () => ({name: 'test1', active: true, category: 'A'}),
-        },
+        createMockDocumentSnapshot(
+          {name: 'test1', active: true, category: 'A'},
+          true,
+          'doc1'
+        ),
       ];
+      const mockQuerySnapshot = createMockQuerySnapshot(mockDocs);
 
-      mockQuery.get.mockResolvedValue(mockFirestoreQuerySnapshot(mockDocs));
+      (mockQuery.get as any).mockResolvedValue(mockQuerySnapshot);
 
       const result = await firestoreService.queryCollection(
         'test-collection',
@@ -602,7 +589,8 @@ describe('FirestoreService', () => {
     });
 
     it('should handle empty query results', async () => {
-      mockQuery.get.mockResolvedValue(mockFirestoreQuerySnapshot([]));
+      const emptyQuerySnapshot = createMockQuerySnapshot([]);
+      (mockQuery.get as any).mockResolvedValue(emptyQuerySnapshot);
 
       const result = await firestoreService.queryCollection(
         'test-collection',
@@ -614,7 +602,7 @@ describe('FirestoreService', () => {
 
     it('should throw FirestoreServiceError when permission denied', async () => {
       const error = new Error('Permission denied: PERMISSION_DENIED');
-      mockQuery.get.mockRejectedValue(error);
+      (mockQuery.get as any).mockRejectedValue(error);
 
       await expect(
         firestoreService.queryCollection('test-collection', filters)
@@ -631,7 +619,7 @@ describe('FirestoreService', () => {
 
     it('should throw FirestoreServiceError when query fails', async () => {
       const error = new Error('Invalid argument: INVALID_ARGUMENT');
-      mockQuery.get.mockRejectedValue(error);
+      (mockQuery.get as any).mockRejectedValue(error);
 
       await expect(
         firestoreService.queryCollection('test-collection', filters)
@@ -648,14 +636,15 @@ describe('FirestoreService', () => {
   });
 
   describe('queryCollectionSnapshot', () => {
-    const filters = [
-      {field: 'active', operator: '==' as WhereFilterOp, value: true},
-    ];
+    const filters = [{field: 'active', operator: '==' as any, value: true}];
 
     it('should return query snapshot', async () => {
-      const mockDocs = [{name: 'test1', active: true}];
+      const mockDocs = [
+        createMockDocumentSnapshot({name: 'test1', active: true}, true, 'doc1'),
+      ];
+      const mockQuerySnapshot = createMockQuerySnapshot(mockDocs);
 
-      mockQuery.get.mockResolvedValue(mockFirestoreQuerySnapshot(mockDocs));
+      (mockQuery.get as any).mockResolvedValue(mockQuerySnapshot);
 
       const result = await firestoreService.queryCollectionSnapshot(
         'test-collection',
@@ -668,7 +657,7 @@ describe('FirestoreService', () => {
 
     it('should verify mock chain is working', async () => {
       const error = new Error('PERMISSION_DENIED');
-      mockQuery.get.mockImplementation(() => Promise.reject(error));
+      (mockQuery.get as any).mockRejectedValue(error);
 
       // Verify the mock chain is set up correctly
       expect(mockDb.collection).toBeDefined();
@@ -681,7 +670,7 @@ describe('FirestoreService', () => {
 
     it('should throw FirestoreServiceError when permission denied', async () => {
       const error = new Error('PERMISSION_DENIED');
-      mockQuery.get.mockImplementation(() => Promise.reject(error));
+      (mockQuery.get as any).mockRejectedValue(error);
 
       await expect(
         firestoreService.queryCollectionSnapshot('test-collection', filters)
@@ -698,7 +687,7 @@ describe('FirestoreService', () => {
 
     it('should throw FirestoreServiceError when query fails', async () => {
       const error = new Error('INVALID_ARGUMENT');
-      mockQuery.get.mockImplementation(() => Promise.reject(error));
+      (mockQuery.get as any).mockRejectedValue(error);
 
       await expect(
         firestoreService.queryCollectionSnapshot('test-collection', filters)
@@ -715,16 +704,15 @@ describe('FirestoreService', () => {
   });
 
   describe('queryCollectionWithRefs', () => {
-    const filters = [
-      {field: 'active', operator: '==' as WhereFilterOp, value: true},
-    ];
+    const filters = [{field: 'active', operator: '==' as any, value: true}];
 
     it('should return query results with references', async () => {
       const mockDocs = [
-        {id: 'doc1', data: () => ({name: 'test1', active: true})},
+        createMockDocumentSnapshot({name: 'test1', active: true}, true, 'doc1'),
       ];
+      const mockQuerySnapshot = createMockQuerySnapshot(mockDocs);
 
-      mockQuery.get.mockResolvedValue(mockFirestoreQuerySnapshot(mockDocs));
+      (mockQuery.get as any).mockResolvedValue(mockQuerySnapshot);
 
       const result = await firestoreService.queryCollectionWithRefs(
         'test-collection',
@@ -739,7 +727,7 @@ describe('FirestoreService', () => {
 
     it('should throw FirestoreServiceError when permission denied', async () => {
       const error = new Error('Permission denied: PERMISSION_DENIED');
-      mockQuery.get.mockRejectedValue(error);
+      (mockQuery.get as any).mockRejectedValue(error);
 
       await expect(
         firestoreService.queryCollectionWithRefs('test-collection', filters)
@@ -748,7 +736,7 @@ describe('FirestoreService', () => {
 
     it('should throw FirestoreServiceError when query fails', async () => {
       const error = new Error('Invalid argument: INVALID_ARGUMENT');
-      mockQuery.get.mockRejectedValue(error);
+      (mockQuery.get as any).mockRejectedValue(error);
 
       await expect(
         firestoreService.queryCollectionWithRefs('test-collection', filters)
@@ -765,9 +753,11 @@ describe('FirestoreService', () => {
       const batchFunction = jest.fn().mockImplementation(async () => {
         // Mock implementation
       });
-      mockBatch.commit.mockResolvedValue(undefined);
+      (mockBatch.commit as any).mockResolvedValue(undefined);
 
-      await firestoreService.runBatch(batchFunction as any);
+      await firestoreService.runBatch(
+        batchFunction as unknown as (batch: WriteBatch) => Promise<void>
+      );
 
       expect(mockDb.batch).toHaveBeenCalled();
       expect(batchFunction).toHaveBeenCalledWith(mockBatch);
@@ -780,11 +770,15 @@ describe('FirestoreService', () => {
       });
 
       await expect(
-        firestoreService.runBatch(batchFunction as any)
+        firestoreService.runBatch(
+          batchFunction as unknown as (batch: WriteBatch) => Promise<void>
+        )
       ).rejects.toThrow(FirestoreServiceError);
 
       await expect(
-        firestoreService.runBatch(batchFunction as any)
+        firestoreService.runBatch(
+          batchFunction as unknown as (batch: WriteBatch) => Promise<void>
+        )
       ).rejects.toMatchObject({
         message: expect.stringContaining('Batch operation'),
         code: FirestoreErrorCode.BATCH_OPERATION_FAILED,
@@ -798,11 +792,15 @@ describe('FirestoreService', () => {
       });
 
       await expect(
-        firestoreService.runBatch(batchFunction as any)
+        firestoreService.runBatch(
+          batchFunction as unknown as (batch: WriteBatch) => Promise<void>
+        )
       ).rejects.toThrow(FirestoreServiceError);
 
       await expect(
-        firestoreService.runBatch(batchFunction as any)
+        firestoreService.runBatch(
+          batchFunction as unknown as (batch: WriteBatch) => Promise<void>
+        )
       ).rejects.toMatchObject({
         message: expect.stringContaining('Permission denied'),
         code: FirestoreErrorCode.PERMISSION_DENIED,
@@ -889,15 +887,15 @@ describe('FirestoreService', () => {
         return 'transaction-result';
       });
       mockDb.runTransaction.mockImplementation(
-        async (
-          updateFunction: (transaction: Transaction) => Promise<string>
-        ) => {
+        async (updateFunction: (transaction: any) => any) => {
           return await updateFunction(mockTransaction);
         }
       );
 
       const result = await firestoreService.runTransaction(
-        mockUpdateFunction as any
+        mockUpdateFunction as unknown as (
+          transaction: Transaction
+        ) => Promise<unknown>
       );
 
       expect(mockDb.runTransaction).toHaveBeenCalled();
@@ -910,19 +908,25 @@ describe('FirestoreService', () => {
         throw new Error('Failed precondition: FAILED_PRECONDITION');
       });
       mockDb.runTransaction.mockImplementation(
-        async (
-          updateFunction: (transaction: Transaction) => Promise<string>
-        ) => {
+        async (updateFunction: (transaction: any) => any) => {
           return await updateFunction(mockTransaction);
         }
       );
 
       await expect(
-        firestoreService.runTransaction(mockUpdateFunction as any)
+        firestoreService.runTransaction(
+          mockUpdateFunction as unknown as (
+            transaction: Transaction
+          ) => Promise<unknown>
+        )
       ).rejects.toThrow(FirestoreServiceError);
 
       await expect(
-        firestoreService.runTransaction(mockUpdateFunction as any)
+        firestoreService.runTransaction(
+          mockUpdateFunction as unknown as (
+            transaction: Transaction
+          ) => Promise<unknown>
+        )
       ).rejects.toMatchObject({
         message: expect.stringContaining('Transaction'),
         code: FirestoreErrorCode.TRANSACTION_FAILED,
@@ -935,19 +939,25 @@ describe('FirestoreService', () => {
         throw new Error('Permission denied: PERMISSION_DENIED');
       });
       mockDb.runTransaction.mockImplementation(
-        async (
-          updateFunction: (transaction: Transaction) => Promise<string>
-        ) => {
+        async (updateFunction: (transaction: any) => any) => {
           return await updateFunction(mockTransaction);
         }
       );
 
       await expect(
-        firestoreService.runTransaction(mockUpdateFunction as any)
+        firestoreService.runTransaction(
+          mockUpdateFunction as unknown as (
+            transaction: Transaction
+          ) => Promise<unknown>
+        )
       ).rejects.toThrow(FirestoreServiceError);
 
       await expect(
-        firestoreService.runTransaction(mockUpdateFunction as any)
+        firestoreService.runTransaction(
+          mockUpdateFunction as unknown as (
+            transaction: Transaction
+          ) => Promise<unknown>
+        )
       ).rejects.toMatchObject({
         message: expect.stringContaining('Permission denied'),
         code: FirestoreErrorCode.PERMISSION_DENIED,
@@ -958,26 +968,20 @@ describe('FirestoreService', () => {
 
   describe('Transaction Helper Methods', () => {
     it('should create document reference', () => {
-      const ref = firestoreService.createDocumentReference(
-        'test-collection',
-        'test-id'
-      );
+      firestoreService.createDocumentReference('test-collection', 'test-id');
 
       expect(mockDb.collection).toHaveBeenCalledWith('test-collection');
       expect(mockCollection.doc).toHaveBeenCalledWith('test-id');
     });
 
     it('should create document reference with auto-generated ID', () => {
-      const ref = firestoreService.createDocumentReference('test-collection');
+      firestoreService.createDocumentReference('test-collection');
 
       expect(mockCollection.doc).toHaveBeenCalledWith();
     });
 
     it('should get document reference', () => {
-      const ref = firestoreService.getDocumentReference(
-        'test-collection',
-        'test-id'
-      );
+      firestoreService.getDocumentReference('test-collection', 'test-id');
 
       expect(mockDb.collection).toHaveBeenCalledWith('test-collection');
       expect(mockCollection.doc).toHaveBeenCalledWith('test-id');
@@ -1052,12 +1056,8 @@ describe('FirestoreService', () => {
 
     it('should get document with transaction', async () => {
       const mockData = {name: 'test', value: 123};
-      mockTransaction.get.mockResolvedValue({
-        exists: true,
-        data: () => mockData,
-        id: 'test-doc-id',
-        ref: {id: 'test-doc-id'},
-      });
+      const mockDocSnapshot = createMockDocumentSnapshot(mockData);
+      (mockTransaction.get as any).mockResolvedValue(mockDocSnapshot);
 
       const result = await firestoreService.getDocumentWithTransaction(
         mockTransaction,
@@ -1070,16 +1070,13 @@ describe('FirestoreService', () => {
     });
 
     it('should query collection with transaction', async () => {
-      const filters = [
-        {field: 'active', operator: '==' as WhereFilterOp, value: true},
-      ];
+      const filters = [{field: 'active', operator: '==' as any, value: true}];
       const mockDocs = [
-        {id: 'doc1', data: () => ({name: 'test1', active: true})},
+        createMockDocumentSnapshot({name: 'test1', active: true}, true, 'doc1'),
       ];
+      const mockQuerySnapshot = createMockQuerySnapshot(mockDocs);
 
-      mockTransaction.get.mockResolvedValue(
-        mockFirestoreQuerySnapshot(mockDocs)
-      );
+      (mockTransaction.get as any).mockResolvedValue(mockQuerySnapshot);
 
       const result = await firestoreService.queryCollectionWithTransaction(
         mockTransaction,
@@ -1134,11 +1131,12 @@ describe('FirestoreService', () => {
 
   describe('Edge Cases', () => {
     it('should handle empty filters array in queries', async () => {
-      const mockDocs = [{id: 'doc1', data: () => ({name: 'test1'})}];
+      const mockDocs = [
+        createMockDocumentSnapshot({name: 'test1'}, true, 'doc1'),
+      ];
+      const mockQuerySnapshot = createMockQuerySnapshot(mockDocs);
 
-      mockCollection.get.mockResolvedValue(
-        mockFirestoreQuerySnapshot(mockDocs)
-      );
+      (mockCollection.get as any).mockResolvedValue(mockQuerySnapshot);
 
       const result = await firestoreService.queryCollection(
         'test-collection',
@@ -1150,7 +1148,7 @@ describe('FirestoreService', () => {
     });
 
     it('should handle null values in field value utilities', () => {
-      const result = firestoreService.arrayUnion(null, 'valid');
+      firestoreService.arrayUnion(null, 'valid');
 
       expect(mockFieldValue.arrayUnion).toHaveBeenCalledWith(null, 'valid');
     });
@@ -1162,7 +1160,7 @@ describe('FirestoreService', () => {
         boolean: true,
       };
 
-      const result = firestoreService.arrayUnion(complexData);
+      firestoreService.arrayUnion(complexData);
 
       expect(mockFieldValue.arrayUnion).toHaveBeenCalledWith(complexData);
     });
@@ -1177,7 +1175,7 @@ describe('FirestoreService', () => {
       const originalError = new Error(
         'Document already exists: ALREADY_EXISTS'
       );
-      mockDoc.create.mockRejectedValue(originalError);
+      (mockDoc.create as any).mockRejectedValue(originalError);
 
       try {
         await firestoreService.createDocument({
@@ -1192,7 +1190,7 @@ describe('FirestoreService', () => {
 
     it('should maintain error chain for debugging', async () => {
       const originalError = new Error('Permission denied: PERMISSION_DENIED');
-      mockDoc.get.mockRejectedValue(originalError);
+      (mockDoc.get as any).mockRejectedValue(originalError);
 
       try {
         await firestoreService.getDocument('test-collection', 'test-id');

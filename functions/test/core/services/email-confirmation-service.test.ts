@@ -1,10 +1,5 @@
 import {EmailConfirmationService} from '../../../src/core/services/email-confirmation-service';
-import {FirestoreService} from '../../../src/core/services/firestore-service';
 import {EmailConfirmationError} from '../../../src/core/errors/services/email-confirmation-error';
-import {
-  FirestoreServiceError,
-  FirestoreErrorCode,
-} from '../../../src/core/errors';
 
 // Mock config
 jest.mock('../../../src/core/config', () => ({

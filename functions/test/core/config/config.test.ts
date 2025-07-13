@@ -214,8 +214,7 @@ describe('Configuration System', () => {
       });
 
       it('should have valid scopes', () => {
-        const config = getRuntimeConfig();
-        const scopes = config.officeRnd.scopes;
+        const scopes = getRuntimeConfig().officeRnd.scopes;
 
         expect(typeof scopes).toBe('string');
         expect(scopes).toContain('officernd.api.read');
@@ -290,8 +289,6 @@ describe('Configuration System', () => {
 
   describe('Type Safety', () => {
     it('should enforce correct environment types', () => {
-      const config = getRuntimeConfig();
-
       // These should be valid
       const validEnvironments: RuntimeConfig['environment'][] = [
         'development',

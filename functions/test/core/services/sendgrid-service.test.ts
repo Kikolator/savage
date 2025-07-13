@@ -4,7 +4,6 @@ import {
   FirestoreServiceError,
   FirestoreErrorCode,
 } from '../../../src/core/errors';
-import {FirestoreService} from '../../../src/core/services/firestore-service';
 import {OfficeRndMemberStatus} from '../../../src/core/data/enums';
 
 // Mock the config module

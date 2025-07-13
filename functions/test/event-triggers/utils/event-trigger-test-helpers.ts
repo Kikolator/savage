@@ -166,8 +166,8 @@ export const createMockTrialday = (overrides: any = {}) => ({
  */
 export const createMockServiceResponses = () => ({
   trialdayService: {
-    sendConfirmationEmail: jest.fn().mockResolvedValue(undefined),
-    addToOfficeRnd: jest.fn().mockResolvedValue({
+    sendConfirmationEmail: (jest.fn() as any).mockResolvedValue(undefined),
+    addToOfficeRnd: (jest.fn() as any).mockResolvedValue({
       member: createMockOfficeRndMember(),
       opportunity: {
         _id: 'test-opportunity-id',
@@ -175,20 +175,20 @@ export const createMockServiceResponses = () => ({
         member: createMockOfficeRndMember(),
       },
     }),
-    addOpportunityAndMemberIdsToTrialday: jest
-      .fn()
-      .mockResolvedValue(undefined),
-    confirm: jest.fn().mockResolvedValue(undefined),
-    sendFollowUpEmail: jest.fn().mockResolvedValue(undefined),
+    addOpportunityAndMemberIdsToTrialday: (jest.fn() as any).mockResolvedValue(
+      undefined
+    ),
+    confirm: (jest.fn() as any).mockResolvedValue(undefined),
+    sendFollowUpEmail: (jest.fn() as any).mockResolvedValue(undefined),
     trialDaysCollection: 'trialDays',
   },
 
   referralService: {
-    createReferral: jest.fn().mockResolvedValue(undefined),
+    createReferral: (jest.fn() as any).mockResolvedValue(undefined),
   },
 
   officeRndService: {
-    updateMember: jest.fn().mockResolvedValue(undefined),
+    updateMember: (jest.fn() as any).mockResolvedValue(undefined),
   },
 });
 

@@ -1,4 +1,4 @@
-import {AppError, ErrorCode} from '../app-error';
+import {AppError} from '../app-error';
 
 export enum EmailConfirmationErrorCode {
   EMAIL_OBJECT_CREATION_FAILED = 'EMAIL_OBJECT_CREATION_FAILED',
@@ -16,6 +16,7 @@ export enum EmailConfirmationErrorCode {
 
 export class EmailConfirmationError extends AppError {
   public readonly serviceCode: EmailConfirmationErrorCode;
+  public readonly code: number;
 
   constructor(
     message: string,
@@ -24,9 +25,10 @@ export class EmailConfirmationError extends AppError {
     details?: any,
     cause?: Error
   ) {
-    super(message, ErrorCode.INVALID_ARGUMENT, status, details, cause);
+    super(message, status, details, cause);
     this.name = 'EmailConfirmationError';
     this.serviceCode = serviceCode;
+    this.code = 9100; // EMAIL_CONFIRMATION_ERROR
   }
 
   static emailObjectCreationFailed(

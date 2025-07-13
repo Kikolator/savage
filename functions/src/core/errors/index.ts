@@ -9,3 +9,5 @@ export * from './services/sendgrid-service-error';
 export * from './event-triggers';
 export * from './scheduled-events';
 export * from './api/office-rnd-controller-error';
+export * from './api/confirm-email-controller-error';
+export * from './api/typeform-controller-error';

@@ -1,4 +1,4 @@
-import {AppError, ErrorCode} from '../app-error';
+import {AppError} from '../app-error';
 
 export enum SendgridServiceErrorCode {
   CLIENT_NOT_INITIALIZED = 'CLIENT_NOT_INITIALIZED',
@@ -18,6 +18,7 @@ export enum SendgridServiceErrorCode {
 
 export class SendgridServiceError extends AppError {
   public readonly serviceCode: SendgridServiceErrorCode;
+  public readonly code: number;
 
   constructor(
     message: string,
@@ -26,9 +27,10 @@ export class SendgridServiceError extends AppError {
     details?: any,
     cause?: Error
   ) {
-    super(message, ErrorCode.INVALID_ARGUMENT, status, details, cause);
+    super(message, status, details, cause);
     this.name = 'SendgridServiceError';
     this.serviceCode = serviceCode;
+    this.code = 9500; // SENDGRID_SERVICE_ERROR
   }
 
   static clientNotInitialized(method: string) {

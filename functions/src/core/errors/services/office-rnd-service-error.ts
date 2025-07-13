@@ -1,4 +1,4 @@
-import {AppError, ErrorCode} from '../app-error';
+import {AppError} from '../app-error';
 
 export enum OfficeRnDServiceErrorCode {
   MEMBER_NOT_FOUND = 'MEMBER_NOT_FOUND',
@@ -27,6 +27,7 @@ export enum OfficeRnDServiceErrorCode {
 
 export class OfficeRnDServiceError extends AppError {
   public readonly serviceCode: OfficeRnDServiceErrorCode;
+  public readonly code: number;
 
   constructor(
     message: string,
@@ -35,9 +36,10 @@ export class OfficeRnDServiceError extends AppError {
     details?: any,
     cause?: Error
   ) {
-    super(message, ErrorCode.INVALID_ARGUMENT, status, details, cause);
+    super(message, status, details, cause);
     this.name = 'OfficeRnDServiceError';
     this.serviceCode = serviceCode;
+    this.code = 9200; // OFFICERND_SERVICE_ERROR
   }
 
   static memberNotFound(memberId: string, details?: any) {

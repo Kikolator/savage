@@ -1,4 +1,4 @@
-import {AppError, ErrorCode} from '../app-error';
+import {AppError} from '../app-error';
 
 /**
  * Specific error codes for Trialday event trigger operations
@@ -15,6 +15,7 @@ export enum TrialdayEventErrorCode {
 
 export class TrialdayEventError extends AppError {
   public readonly eventCode: TrialdayEventErrorCode;
+  public readonly code: number;
 
   constructor(
     message: string,
@@ -29,10 +30,9 @@ export class TrialdayEventError extends AppError {
       ...(data as Record<string, unknown>),
     };
 
-    // Cast local error code to global ErrorCode for compatibility
-    // TODO: Remove this cast when AppError is updated to support local error codes
-    super(message, eventCode as unknown as ErrorCode, 0, details);
+    super(message, 0, details);
     this.eventCode = eventCode;
+    this.code = eventCode;
   }
 
   /**

@@ -564,11 +564,6 @@ describe('OfficeRndScheduledEvents', () => {
 
     describe('Success scenarios', () => {
       it('should process trial complete opportunities successfully', async () => {
-        // Set up trial complete opportunities
-        const trialCompleteOpportunities = sampleOpportunities.filter(
-          (opp) => opp.status === 'status2' // trialComplete status
-        );
-
         await handler();
 
         expect(mockOfficeRndService.getOpportunityStatuses).toHaveBeenCalled();

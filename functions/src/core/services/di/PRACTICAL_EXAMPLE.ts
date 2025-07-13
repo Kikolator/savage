@@ -7,7 +7,7 @@
 
 import {logger} from 'firebase-functions';
 
-import {container, initializeContainer} from './container';
+import {container} from './container';
 
 // Example: Request-scoped service (Factory Pattern)
 class RequestContext {

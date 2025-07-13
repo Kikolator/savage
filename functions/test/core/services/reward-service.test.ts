@@ -1,10 +1,5 @@
-import {FieldValue, Timestamp} from 'firebase-admin/firestore';
-
 import {RewardService} from '../../../src/core/services/reward-service';
 import {RewardServiceError} from '../../../src/core/errors';
-import {FirestoreService} from '../../../src/core/services/firestore-service';
-import {BankPayoutService} from '../../../src/core/services/bank-payout-service';
-import OfficeRndService from '../../../src/core/services/office-rnd-service';
 import {Referral, Reward} from '../../../src/core/data/models';
 import {
   ReferralStatus,
@@ -12,12 +7,6 @@ import {
   RewardStatus,
   PayoutChannel,
 } from '../../../src/core/data/enums';
-
-// Mock Timestamp
-const mockTimestamp = {
-  fromDate: jest.fn((date: Date) => ({toDate: () => date})),
-  now: jest.fn(() => ({toDate: () => new Date()})),
-};
 
 jest.mock('firebase-admin/firestore', () => ({
   FieldValue: {
@@ -71,12 +60,6 @@ const mockOfficeRndService = {
 const mockBankPayoutService = {
   issueTransfer: jest.fn(),
 };
-
-const baseDeps = () => ({
-  firestoreService: mockFirestoreService,
-  officeRndService: mockOfficeRndService,
-  bankPayoutService: mockBankPayoutService,
-});
 
 const sampleMemberReferral = new Referral({
   id: 'referral-1',
