@@ -35,7 +35,7 @@ export function getRuntimeConfig(): RuntimeConfig {
   return {
     environment: environment as RuntimeConfig['environment'],
     sendgrid: {
-      apiKey: SECRETS.sendgridApiKey.value(),
+      apiKey: getSecretValue(SECRETS.sendgridApiKey, 'SENDGRID_API_KEY'),
       fromEmail: 'noreply@savage-coworking.com',
       templates: {
         trialdayConfirmation: 'd-25105204bd734ff49bcfb6dbd3ce4deb',
@@ -51,14 +51,42 @@ export function getRuntimeConfig(): RuntimeConfig {
       apiV2url: 'https://app.officernd.com/api/v2/organizations',
       defaultLocationId: '5d1bcda0dbd6e40010479eec',
       defaultReferralPlanId: '68544dc51579c137fb109286',
-      secretKey: SECRETS.officeRndSecretKey.value(),
-      webhookSecret: SECRETS.officeRndWebhookSecret.value(),
+      secretKey: getSecretValue(
+        SECRETS.officeRndSecretKey,
+        'OFFICE_RND_SECRET'
+      ),
+      webhookSecret: getSecretValue(
+        SECRETS.officeRndWebhookSecret,
+        'OFFICE_RND_WEBHOOK_SECRET'
+      ),
     },
     typeform: {
-      secretKey: SECRETS.typeformSecretKey.value(),
+      secretKey: getSecretValue(SECRETS.typeformSecretKey, 'TYPEFORM_SECRET'),
     },
     savage: {
-      secret: SECRETS.savageSecret.value(),
+      secret: getSecretValue(SECRETS.savageSecret, 'SAVAGE_SECRET'),
     },
   };
+}
+
+/**
+ * Safely get secret value, providing fallback for development/emulator environments
+ */
+function getSecretValue(secret: any, secretName: string): string {
+  try {
+    return secret.value();
+  } catch (error) {
+    // In development/emulator environments, provide fallback values
+    if (
+      process.env.NODE_ENV === 'development' ||
+      process.env.FUNCTIONS_EMULATOR
+    ) {
+      console.warn(
+        `Warning: Using fallback value for secret ${secretName} in development/emulator mode`
+      );
+      return `mock-${secretName.toLowerCase()}`;
+    }
+    // In production, re-throw the error
+    throw error;
+  }
 }

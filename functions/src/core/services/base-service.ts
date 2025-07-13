@@ -67,20 +67,34 @@ export abstract class BaseService<T = unknown> {
    */
   protected logMethodEntry(
     methodName: string,
-    params?: Record<string, any>
+    params?: Record<string, unknown>
   ): void {
-    logger.info(`${this.getServiceName()}.${methodName}() called`, params);
+    const logData: Record<string, unknown> = {};
+
+    if (params !== undefined) {
+      logData.params = params;
+    } else {
+      logData.params = 'none';
+    }
+
+    logger.info(`${this.getServiceName()}.${methodName}() called`, logData);
   }
 
   /**
    * Log service method completion
    */
-  protected logMethodSuccess(methodName: string, result?: any): void {
+  protected logMethodSuccess(methodName: string, result?: unknown): void {
+    const logData: Record<string, unknown> = {};
+
+    if (result !== undefined) {
+      logData.result = result;
+    } else {
+      logData.result = 'void';
+    }
+
     logger.info(
       `${this.getServiceName()}.${methodName}() completed successfully`,
-      {
-        result: result !== undefined ? 'present' : 'void',
-      }
+      logData
     );
   }
 

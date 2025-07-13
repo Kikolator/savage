@@ -107,8 +107,11 @@ describe('SendgridScheduledEvents', () => {
         expect(mockFirestoreService.setDocument).toHaveBeenCalledWith(
           expect.objectContaining({
             collection: 'sendgrid',
-            documentId: 'metadata/sync-status',
-            data: expect.objectContaining({status: 'completed'}),
+            documentId: 'metadata',
+            merge: true,
+            data: expect.objectContaining({
+              syncStatus: expect.objectContaining({status: 'completed'}),
+            }),
           })
         );
       });
@@ -123,11 +126,14 @@ describe('SendgridScheduledEvents', () => {
         expect(mockFirestoreService.setDocument).toHaveBeenCalledWith(
           expect.objectContaining({
             collection: 'sendgrid',
-            documentId: 'metadata/sync-status',
+            documentId: 'metadata',
+            merge: true,
             data: expect.objectContaining({
-              status: 'completed',
-              customFieldsCount: 0,
-              listsCount: 0,
+              syncStatus: expect.objectContaining({
+                status: 'completed',
+                customFieldsCount: 0,
+                listsCount: 0,
+              }),
             }),
           })
         );
@@ -143,11 +149,14 @@ describe('SendgridScheduledEvents', () => {
         expect(mockFirestoreService.setDocument).toHaveBeenCalledWith(
           expect.objectContaining({
             collection: 'sendgrid',
-            documentId: 'metadata/sync-status',
+            documentId: 'metadata',
+            merge: true,
             data: expect.objectContaining({
-              status: 'completed',
-              customFieldsCount: 0,
-              listsCount: 0,
+              syncStatus: expect.objectContaining({
+                status: 'completed',
+                customFieldsCount: 0,
+                listsCount: 0,
+              }),
             }),
           })
         );
@@ -286,10 +295,13 @@ describe('SendgridScheduledEvents', () => {
         expect(mockFirestoreService.setDocument).toHaveBeenCalledWith(
           expect.objectContaining({
             collection: 'sendgrid',
-            documentId: 'metadata/sync-status',
+            documentId: 'metadata',
+            merge: true,
             data: expect.objectContaining({
-              status: 'failed',
-              error: 'SendGrid API error',
+              syncStatus: expect.objectContaining({
+                status: 'failed',
+                error: 'SendGrid API error',
+              }),
             }),
           })
         );
@@ -307,10 +319,13 @@ describe('SendgridScheduledEvents', () => {
         expect(mockFirestoreService.setDocument).toHaveBeenCalledWith(
           expect.objectContaining({
             collection: 'sendgrid',
-            documentId: 'metadata/sync-status',
+            documentId: 'metadata',
+            merge: true,
             data: expect.objectContaining({
-              status: 'failed',
-              error: 'SendGrid API error',
+              syncStatus: expect.objectContaining({
+                status: 'failed',
+                error: 'SendGrid API error',
+              }),
             }),
           })
         );
@@ -329,10 +344,13 @@ describe('SendgridScheduledEvents', () => {
         expect(mockFirestoreService.setDocument).toHaveBeenCalledWith(
           expect.objectContaining({
             collection: 'sendgrid',
-            documentId: 'metadata/sync-status',
+            documentId: 'metadata',
+            merge: true,
             data: expect.objectContaining({
-              status: 'failed',
-              error: 'Firestore batch error',
+              syncStatus: expect.objectContaining({
+                status: 'failed',
+                error: 'Firestore batch error',
+              }),
             }),
           })
         );
@@ -467,11 +485,14 @@ describe('SendgridScheduledEvents', () => {
         expect(mockFirestoreService.setDocument).toHaveBeenCalledWith(
           expect.objectContaining({
             collection: 'sendgrid',
-            documentId: 'metadata/sync-status',
+            documentId: 'metadata',
+            merge: true,
             data: expect.objectContaining({
-              status: 'completed',
-              customFieldsCount: 3, // The original array length, not filtered count
-              listsCount: 3, // The original array length, not filtered count
+              syncStatus: expect.objectContaining({
+                status: 'completed',
+                customFieldsCount: 3, // The original array length, not filtered count
+                listsCount: 3, // The original array length, not filtered count
+              }),
             }),
           })
         );

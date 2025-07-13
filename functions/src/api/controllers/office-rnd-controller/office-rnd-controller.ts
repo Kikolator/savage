@@ -7,6 +7,7 @@ import {BaseController} from '../base-controller';
 import {HttpServer} from '..';
 import {OfficeRndControllerError} from '../../../core/errors';
 import {getConfig} from '../../../core/config';
+import {isDevelopment} from '../../../core/utils/environment';
 import OfficeRndService from '../../../core/services/office-rnd-service';
 import {FirestoreService} from '../../../core/services/firestore-service';
 import {SendgridService} from '../../../core/services/sendgrid-service';
@@ -251,42 +252,44 @@ class OfficeRndController extends BaseController {
     try {
       this.logInfo('Starting cleanup of faulty webhook documents');
 
-      // Verify caller by checking the secret
-      const secret = req.headers['savage-secret'];
-      if (secret !== this.config.savage.secret) {
-        throw OfficeRndControllerError.invalidSignature(
-          'cleanupFaultyWebhooks',
-          {
-            reason:
-              'Invalid secret for cleanupFaultyWebhooks. This endpoint is only accessible to Savage.',
-          }
-        );
+      // Verify caller by checking the secret (skip in development mode)
+      if (!isDevelopment()) {
+        const secret = req.headers['savage-secret'];
+        if (secret !== this.config.savage.secret) {
+          throw OfficeRndControllerError.invalidSignature(
+            'cleanupFaultyWebhooks',
+            {
+              reason:
+                'Invalid secret for cleanupFaultyWebhooks. This endpoint is only accessible to Savage.',
+            }
+          );
+        }
+      } else {
+        this.logInfo('Skipping signature verification in development mode');
       }
 
-      // Get all documents from the members collection
-      const query = await this.firestoreService.getCollection(
+      // Get all documents from the members collection with their references
+      const queryResult = await this.firestoreService.getCollectionWithRefs(
         OfficeRndService.membersCollection
       );
 
       const faultyDocuments: Array<{id: string; data: DocumentData}> = [];
       const validDocuments: Array<{id: string; data: DocumentData}> = [];
 
-      query.forEach((documentData, documentId) => {
+      // Iterate through data and refs together to get actual document IDs
+      queryResult.data.forEach((documentData, index) => {
         const data = documentData as DocumentData;
+        const documentRef = queryResult.refs[index];
+        const documentId = documentRef.id; // This is the actual Firestore document ID
 
-        // Check if this is a faulty document (has the webhook body structure)
-        // Faulty documents will have: { object: {...}, previousAttributes: {...} }
-        // Valid documents will have: { _id: string, ... }
-        if (data.data.object && data.data.previousAttributes) {
-          faultyDocuments.push({id: String(documentId), data});
-        } else if (data._id) {
-          validDocuments.push({id: String(documentId), data});
+        // Check if this is a faulty document by checking for missing _id field
+        // Valid OfficeRnd documents will have: { _id: string, ... }
+        // Faulty webhook documents will have: { object: {...}, previousAttributes: {...} } (no _id)
+        if (data && typeof data === 'object' && '_id' in data) {
+          validDocuments.push({id: documentId, data});
         } else {
-          // Unknown structure, log for investigation
-          this.logWarn('Unknown document structure found', {
-            documentId,
-            dataKeys: Object.keys(data),
-          });
+          // No _id field = faulty document
+          faultyDocuments.push({id: documentId, data});
         }
       });
 

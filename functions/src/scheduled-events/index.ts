@@ -1,10 +1,12 @@
 import {InitializeScheduledEvents} from './initialize-scheduled-events';
 import {OfficeRndScheduledEvents} from './on-schedule-events/office-rnd-scheduled-events';
+import {RewardScheduledEvents} from './on-schedule-events/reward-scheduled-events';
 import {SendgridScheduledEvents} from './on-schedule-events/sendgrid-scheduled-events';
 
 const scheduledEventsList: Array<InitializeScheduledEvents> = [
   new SendgridScheduledEvents(),
   new OfficeRndScheduledEvents(),
+  new RewardScheduledEvents(),
 ];
 
 export function scheduledEvents() {

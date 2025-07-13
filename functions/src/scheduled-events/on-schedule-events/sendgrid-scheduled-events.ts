@@ -402,10 +402,12 @@ export class SendgridScheduledEvents implements InitializeScheduledEvents {
       const firestoreService = FirestoreService.getInstance();
       await firestoreService.setDocument({
         collection: 'sendgrid',
-        documentId: 'metadata/sync-status',
+        documentId: 'metadata',
         data: {
-          ...metadata,
-          updated_at: new Date(),
+          syncStatus: {
+            ...metadata,
+            updated_at: new Date(),
+          },
         },
         merge: true,
       });

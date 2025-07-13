@@ -187,7 +187,14 @@ export class OfficeRndScheduledEvents implements InitializeScheduledEvents {
             lastBackup: new Date(),
             firestoreMembers: firestoreMembers.length,
             apiMembers: apiMembers.length,
-            missingRecords:
+            missingMembers: missingMembers.length,
+            firestoreOpportunities: firestoreOpportunities.length,
+            apiOpportunities: apiOpportunities.length,
+            missingOpportunities: missingOpportunities.length,
+            firestoreCompanies: firestoreCompanies.length,
+            apiCompanies: apiCompanies.length,
+            missingCompanies: missingCompanies.length,
+            totalMissingRecords:
               missingMembers.length +
               missingOpportunities.length +
               missingCompanies.length,
@@ -579,7 +586,14 @@ export class OfficeRndScheduledEvents implements InitializeScheduledEvents {
     lastBackup: Date;
     firestoreMembers?: number;
     apiMembers?: number;
-    missingRecords?: number;
+    missingMembers?: number;
+    firestoreOpportunities?: number;
+    apiOpportunities?: number;
+    missingOpportunities?: number;
+    firestoreCompanies?: number;
+    apiCompanies?: number;
+    missingCompanies?: number;
+    totalMissingRecords?: number;
     status: 'completed' | 'failed';
     error?: string;
   }): Promise<void> {

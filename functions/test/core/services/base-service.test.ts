@@ -85,12 +85,12 @@ describe('BaseService', () => {
 
       expect(mockLogger.info).toHaveBeenCalledWith(
         'TestService.testMethod() called',
-        {param: 'value'}
+        {params: {param: 'value'}}
       );
       expect(mockLogger.info).toHaveBeenCalledWith(
         'TestService.testMethod() completed successfully',
         {
-          result: 'present',
+          result: 'result',
         }
       );
     });
@@ -202,7 +202,7 @@ describe('BaseService', () => {
 
       expect(mockLogger.info).toHaveBeenCalledWith(
         'ErrorTestService.methodWithError() called',
-        undefined
+        {params: 'none'}
       );
       expect(mockLogger.error).toHaveBeenCalledWith(
         'ErrorTestService.methodWithError() failed',
@@ -233,7 +233,7 @@ describe('BaseService', () => {
 
       expect(mockLogger.info).toHaveBeenCalledWith(
         'LoggingTestService.testLogging() called',
-        {test: true}
+        {params: {test: true}}
       );
     });
 
@@ -243,7 +243,7 @@ describe('BaseService', () => {
 
       expect(mockLogger.info).toHaveBeenCalledWith(
         'LoggingTestService.testLoggingWithoutParams() called',
-        undefined
+        {params: 'none'}
       );
     });
 
@@ -254,7 +254,7 @@ describe('BaseService', () => {
       expect(mockLogger.info).toHaveBeenCalledWith(
         'LoggingTestService.testLogging() completed successfully',
         {
-          result: 'present',
+          result: 'success',
         }
       );
     });
