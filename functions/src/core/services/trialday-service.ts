@@ -29,14 +29,23 @@ interface TrialdayServiceDependencies {
 
 export class TrialdayService extends BaseServiceWithDependencies<TrialdayServiceDependencies> {
   public static readonly trialDaysCollection = 'trialDays';
-  private readonly config: ReturnType<typeof getConfig>;
+  private config: ReturnType<typeof getConfig> | null = null;
   private static instance: TrialdayService | null = null;
 
   // Inject dependencies
   constructor(dependencies: TrialdayServiceDependencies) {
     super(dependencies);
-    // Get config when service is instantiated
-    this.config = getConfig();
+    // Defer config access until first use to avoid deployment issues
+  }
+
+  /**
+   * Get the config, initializing it if needed
+   */
+  private getConfigSafe(): ReturnType<typeof getConfig> {
+    if (!this.config) {
+      this.config = getConfig();
+    }
+    return this.config;
   }
 
   /**
@@ -371,7 +380,7 @@ export class TrialdayService extends BaseServiceWithDependencies<TrialdayService
         const memberData: OfficeRndNewMember = {
           email: trialday.email,
           name: `${trialday.firstName} ${trialday.lastName}`,
-          location: this.config.runtime.officeRnd.defaultLocationId,
+          location: this.getConfigSafe().runtime.officeRnd.defaultLocationId,
           startDate: new Date(),
           description: '',
           properties: {
@@ -454,7 +463,8 @@ export class TrialdayService extends BaseServiceWithDependencies<TrialdayService
           name: 'Savage Coworking',
         },
         to: trialday.email,
-        templateId: this.config.runtime.sendgrid.templates.trialdayConfirmation,
+        templateId:
+          this.getConfigSafe().runtime.sendgrid.templates.trialdayConfirmation,
         dynamicTemplateData: {
           first_name: trialday.firstName,
           trial_date: format(
@@ -499,16 +509,17 @@ export class TrialdayService extends BaseServiceWithDependencies<TrialdayService
 
     try {
       // 1. Send email confirmation.
-      const signupUrl = `${this.config.static.urls.website}/signup?utm_source=trialday&utm_medium=email&utm_campaign=trialday-follow-up`;
-      const daypassUrl = `${this.config.static.urls.website}/daypass?utm_source=trialday&utm_medium=email&utm_campaign=trialday-follow-up`;
-      const messageUrl = `${this.config.static.urls.website}/message?utm_source=trialday&utm_medium=email&utm_campaign=trialday-follow-up`;
+      const signupUrl = `${this.getConfigSafe().static.urls.website}/signup?utm_source=trialday&utm_medium=email&utm_campaign=trialday-follow-up`;
+      const daypassUrl = `${this.getConfigSafe().static.urls.website}/daypass?utm_source=trialday&utm_medium=email&utm_campaign=trialday-follow-up`;
+      const messageUrl = `${this.getConfigSafe().static.urls.website}/message?utm_source=trialday&utm_medium=email&utm_campaign=trialday-follow-up`;
       const mailData: MailDataRequired = {
         from: {
           email: 'no-reply@savage-coworking.com',
           name: 'Savage Coworking',
         },
         to: trialday.email,
-        templateId: this.config.runtime.sendgrid.templates.trialdayFollowUp,
+        templateId:
+          this.getConfigSafe().runtime.sendgrid.templates.trialdayFollowUp,
         dynamicTemplateData: {
           first_name: trialday.firstName,
           signup_url: signupUrl,

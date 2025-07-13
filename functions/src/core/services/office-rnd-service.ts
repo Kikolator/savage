@@ -29,7 +29,8 @@ interface OfficeRndServiceDependencies {
 export default class OfficeRndService extends BaseServiceWithDependencies<OfficeRndServiceDependencies> {
   private static instance: OfficeRndService | null = null;
   private token: OfficeRndTokenResponse | null = null;
-  private readonly config: ReturnType<typeof getConfig>['runtime']['officeRnd'];
+  private config: ReturnType<typeof getConfig>['runtime']['officeRnd'] | null =
+    null;
   public static readonly metadataCollection = 'officeRndMetadata';
   public static readonly tokenDocumentId = 'token';
   public static readonly opportunityStatusesCollection =
@@ -40,9 +41,7 @@ export default class OfficeRndService extends BaseServiceWithDependencies<Office
 
   constructor(dependencies: OfficeRndServiceDependencies) {
     super(dependencies);
-    // Get runtime config when service is instantiated
-    const appConfig = getConfig();
-    this.config = appConfig.runtime.officeRnd;
+    // Defer config access until first use to avoid deployment issues
   }
 
   /**
@@ -71,6 +70,19 @@ export default class OfficeRndService extends BaseServiceWithDependencies<Office
    */
   private get firestoreService(): FirestoreService {
     return this.getDependency('firestoreService');
+  }
+
+  /**
+   * Get the OfficeRnd config, initializing it if needed
+   */
+  private get officeRndConfig(): ReturnType<
+    typeof getConfig
+  >['runtime']['officeRnd'] {
+    if (!this.config) {
+      const appConfig = getConfig();
+      this.config = appConfig.runtime.officeRnd;
+    }
+    return this.config!;
   }
 
   /**
@@ -103,7 +115,7 @@ export default class OfficeRndService extends BaseServiceWithDependencies<Office
         logger.debug(`${methodName} - Fetching page ${pageCount}`);
 
         // Build URL with endpoint and parameters
-        let url = `${this.config.apiV2url}/${this.config.orgSlug}/${endpoint}`;
+        let url = `${this.officeRndConfig.apiV2url}/${this.officeRndConfig.orgSlug}/${endpoint}`;
         const params = new URLSearchParams();
 
         // Add additional parameters if provided
@@ -216,7 +228,7 @@ export default class OfficeRndService extends BaseServiceWithDependencies<Office
 
       // Refresh token if expired
       if (tokenExpiry < now) {
-        await this._getAndSaveToken(this.config.secretKey);
+        await this._getAndSaveToken(this.officeRndConfig.secretKey);
 
         // Get the new token from firestore
         this.token = (await this.firestoreService.getDocument(
@@ -234,7 +246,7 @@ export default class OfficeRndService extends BaseServiceWithDependencies<Office
         error instanceof FirestoreServiceError &&
         Number(error.code) === FirestoreErrorCode.DOCUMENT_NOT_FOUND
       ) {
-        await this._getAndSaveToken(this.config.secretKey);
+        await this._getAndSaveToken(this.officeRndConfig.secretKey);
         await this.initializeToken();
         return;
       }
@@ -263,9 +275,9 @@ export default class OfficeRndService extends BaseServiceWithDependencies<Office
       }
 
       // Get config for Office Rnd.
-      const clientId = this.config.clientId;
-      const grantType = this.config.grantType;
-      const scopes = this.config.scopes;
+      const clientId = this.officeRndConfig.clientId;
+      const grantType = this.officeRndConfig.grantType;
+      const scopes = this.officeRndConfig.scopes;
       // Encode params.
       const encodedParams = new URLSearchParams();
       encodedParams.set('client_id', clientId);
@@ -320,7 +332,7 @@ export default class OfficeRndService extends BaseServiceWithDependencies<Office
         );
       }
       // Get member from Office Rnd.
-      const url = `${this.config.apiV2url}/${this.config.orgSlug}/members/${id}`;
+      const url = `${this.officeRndConfig.apiV2url}/${this.officeRndConfig.orgSlug}/members/${id}`;
       const options = {
         method: 'GET',
         headers: {
@@ -485,7 +497,7 @@ export default class OfficeRndService extends BaseServiceWithDependencies<Office
         );
       }
       // Update the member.
-      const url = `${this.config.apiV2url}/${this.config.orgSlug}/members/${id}`;
+      const url = `${this.officeRndConfig.apiV2url}/${this.officeRndConfig.orgSlug}/members/${id}`;
       const options = {
         method: 'PUT',
         headers: {
@@ -569,7 +581,7 @@ export default class OfficeRndService extends BaseServiceWithDependencies<Office
           'OfficeRndService.createMember()'
         );
       }
-      const url = `${this.config.apiV2url}/${this.config.orgSlug}/members`;
+      const url = `${this.officeRndConfig.apiV2url}/${this.officeRndConfig.orgSlug}/members`;
       const options = {
         method: 'POST',
         headers: {
@@ -661,7 +673,7 @@ export default class OfficeRndService extends BaseServiceWithDependencies<Office
         );
       }
 
-      const url = `${this.config.apiV2url}/${this.config.orgSlug}/opportunity-statuses`;
+      const url = `${this.officeRndConfig.apiV2url}/${this.officeRndConfig.orgSlug}/opportunity-statuses`;
       const options = {
         method: 'GET',
         headers: {
@@ -816,7 +828,7 @@ export default class OfficeRndService extends BaseServiceWithDependencies<Office
           'OfficeRndService.updateOpportunity()'
         );
       }
-      const url = `${this.config.apiV2url}/${this.config.orgSlug}/opportunities/${id}`;
+      const url = `${this.officeRndConfig.apiV2url}/${this.officeRndConfig.orgSlug}/opportunities/${id}`;
       const options = {
         method: 'PUT',
         headers: {
@@ -884,7 +896,7 @@ export default class OfficeRndService extends BaseServiceWithDependencies<Office
           'OfficeRndService.createOpportunity()'
         );
       }
-      const url = `${this.config.apiV2url}/${this.config.orgSlug}/opportunities`;
+      const url = `${this.officeRndConfig.apiV2url}/${this.officeRndConfig.orgSlug}/opportunities`;
       const options = {
         method: 'POST',
         headers: {
@@ -948,7 +960,7 @@ export default class OfficeRndService extends BaseServiceWithDependencies<Office
           'OfficeRndService.addOverPayment()'
         );
       }
-      const url = `${this.config.apiV2url}/${this.config.orgSlug}/payments`;
+      const url = `${this.officeRndConfig.apiV2url}/${this.officeRndConfig.orgSlug}/payments`;
 
       const options = {
         method: 'POST',
@@ -959,7 +971,7 @@ export default class OfficeRndService extends BaseServiceWithDependencies<Office
         },
         body: JSON.stringify({
           date: params.issueDate,
-          location: this.config.defaultLocationId,
+          location: this.officeRndConfig.defaultLocationId,
           lines: params.paymentLines,
           member: params.memberId,
           company: params.companyId,
@@ -1043,7 +1055,7 @@ export default class OfficeRndService extends BaseServiceWithDependencies<Office
       } = {
         name: params.feeName,
         issueDate: params.issueDate.toDateString(),
-        location: this.config.defaultLocationId,
+        location: this.officeRndConfig.defaultLocationId,
         plan: params.planId,
         price: params.price,
         member: params.memberId,
@@ -1052,7 +1064,7 @@ export default class OfficeRndService extends BaseServiceWithDependencies<Office
         bodyObject.company = params.companyId;
       }
 
-      const url = `${this.config.apiV2url}/${this.config.orgSlug}/fees`;
+      const url = `${this.officeRndConfig.apiV2url}/${this.officeRndConfig.orgSlug}/fees`;
       const options = {
         method: 'POST',
         headers: {

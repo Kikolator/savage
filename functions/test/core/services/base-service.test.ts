@@ -167,7 +167,8 @@ describe('BaseService', () => {
       const service = new TestServiceWithDeps(mockDeps);
 
       await expect(service.testMissingDependency()).rejects.toThrow(
-        'Dependency "missing" not found in TestServiceWithDeps'
+        // eslint-disable-next-line quotes
+        "Dependency 'missing' not found in TestServiceWithDeps"
       );
     });
 

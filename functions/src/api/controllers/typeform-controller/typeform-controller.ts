@@ -17,7 +17,7 @@ class TypeformController extends BaseController {
     string,
     (data: TypeformResponse) => Promise<void>
   > = new Map();
-  private readonly config: ReturnType<typeof getConfig>['runtime'];
+  private config: ReturnType<typeof getConfig>['runtime'] | null = null;
 
   constructor(
     private readonly params: {
@@ -26,15 +26,24 @@ class TypeformController extends BaseController {
   ) {
     super();
 
-    // Get runtime config when controller is instantiated
-    const appConfig = getConfig();
-    this.config = appConfig.runtime;
+    // Defer config access until first use to avoid deployment issues
 
     // Bind the handlers in the constructor
     TypeformController.formHandlers.set(
       STATIC_CONFIG.typeform.ids.trialDay,
       this.handleTrialDayForm.bind(this)
     );
+  }
+
+  /**
+   * Get the runtime config, initializing it if needed
+   */
+  private getRuntimeConfig(): ReturnType<typeof getConfig>['runtime'] {
+    if (!this.config) {
+      const appConfig = getConfig();
+      this.config = appConfig.runtime;
+    }
+    return this.config;
   }
 
   initialize(httpServer: HttpServer): void {
@@ -130,7 +139,7 @@ class TypeformController extends BaseController {
       throw TypeformControllerError.noRawBody('verifyTypeformSignature');
     }
 
-    const secret = this.config.typeform.secretKey;
+    const secret = this.getRuntimeConfig().typeform.secretKey;
 
     // Create HMAC and update with raw buffer
     const hmac = crypto.createHmac('sha256', secret);

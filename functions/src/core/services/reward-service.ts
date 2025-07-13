@@ -18,7 +18,7 @@ import OfficeRndService from './office-rnd-service';
 
 export class RewardService extends BaseService<RewardService> {
   private readonly rewardsCollection = 'rewards';
-  private readonly config: ReturnType<typeof getConfig>;
+  private config: ReturnType<typeof getConfig> | null = null;
 
   constructor(
     private readonly firestoreService: FirestoreService,
@@ -26,8 +26,17 @@ export class RewardService extends BaseService<RewardService> {
     private readonly bankPayoutService: BankPayoutService
   ) {
     super();
-    // Get config when service is instantiated
-    this.config = getConfig();
+    // Defer config access until first use to avoid deployment issues
+  }
+
+  /**
+   * Get the config, initializing it if needed
+   */
+  private getConfigSafe(): ReturnType<typeof getConfig> {
+    if (!this.config) {
+      this.config = getConfig();
+    }
+    return this.config;
   }
 
   protected async performInitialization(): Promise<void> {
@@ -228,7 +237,7 @@ export class RewardService extends BaseService<RewardService> {
         await this.officeRndService.addNewFee({
           memberId: reward.referrerId,
           feeName: 'Referral Reward',
-          planId: this.config.runtime.officeRnd.defaultReferralPlanId,
+          planId: this.getConfigSafe().runtime.officeRnd.defaultReferralPlanId,
           price: reward.amountEur,
           issueDate: reward.dueDate,
           companyId: reward.referrerCompanyId, // TODO implement companyId

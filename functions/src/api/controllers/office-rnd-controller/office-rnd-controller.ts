@@ -22,7 +22,7 @@ interface OfficeRndWebhookBody {
 }
 
 class OfficeRndController extends BaseController {
-  private readonly config: ReturnType<typeof getConfig>['runtime'];
+  private config: ReturnType<typeof getConfig>['runtime'] | null = null;
 
   constructor(
     private readonly officeRndService: OfficeRndService,
@@ -31,9 +31,18 @@ class OfficeRndController extends BaseController {
   ) {
     super();
 
-    // Get runtime config when controller is instantiated
-    const appConfig = getConfig();
-    this.config = appConfig.runtime;
+    // Defer config access until first use to avoid deployment issues
+  }
+
+  /**
+   * Get the runtime config, initializing it if needed
+   */
+  private getRuntimeConfig(): ReturnType<typeof getConfig>['runtime'] {
+    if (!this.config) {
+      const appConfig = getConfig();
+      this.config = appConfig.runtime;
+    }
+    return this.config;
   }
 
   initialize(httpServer: HttpServer): void {
@@ -125,7 +134,7 @@ class OfficeRndController extends BaseController {
       );
     }
 
-    const webhookSecret = this.config.officeRnd.webhookSecret;
+    const webhookSecret = this.getRuntimeConfig().officeRnd.webhookSecret;
 
     const signatureHeaderParts = officeRndSignature.split(',');
     const timestampParts = signatureHeaderParts[0].split('=');
@@ -255,7 +264,7 @@ class OfficeRndController extends BaseController {
       // Verify caller by checking the secret (skip in development mode)
       if (!isDevelopment()) {
         const secret = req.headers['savage-secret'];
-        if (secret !== this.config.savage.secret) {
+        if (secret !== this.getRuntimeConfig().savage.secret) {
           throw OfficeRndControllerError.invalidSignature(
             'cleanupFaultyWebhooks',
             {
@@ -420,7 +429,7 @@ class OfficeRndController extends BaseController {
 
     // Verify caller by checking the secret.
     const secret = req.headers['savage-secret'];
-    if (secret !== this.config.savage.secret) {
+    if (secret !== this.getRuntimeConfig().savage.secret) {
       throw OfficeRndControllerError.invalidSignature('initializeOfficeRnd', {
         reason:
           'Invalid secret for initializeOfficeRnd. This endpoint is only accessible to Savage.',

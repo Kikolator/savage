@@ -35,13 +35,12 @@ export class SendgridService extends BaseServiceWithDependencies<SendgridService
   private client: Client | null = null;
   private mail: MailService | null = null;
   private static instance: SendgridService | null = null;
-  private readonly config: ReturnType<typeof getConfig>['runtime']['sendgrid'];
+  private config: ReturnType<typeof getConfig>['runtime']['sendgrid'] | null =
+    null;
 
   constructor(dependencies: SendgridServiceDependencies) {
     super(dependencies);
-    // Get runtime config when service is instantiated
-    const appConfig = getConfig();
-    this.config = appConfig.runtime.sendgrid;
+    // Defer config access until first use to avoid deployment issues
   }
 
   /**
@@ -79,8 +78,14 @@ export class SendgridService extends BaseServiceWithDependencies<SendgridService
     try {
       this.logMethodEntry('performInitialization');
 
+      // Get config on first use to avoid deployment issues
+      if (!this.config) {
+        const appConfig = getConfig();
+        this.config = appConfig.runtime.sendgrid;
+      }
+
       if (!this.apiKey) {
-        this.apiKey = this.config.apiKey;
+        this.apiKey = this.config!.apiKey;
         if (!this.apiKey) {
           throw SendgridServiceError.apiKeyMissing();
         }

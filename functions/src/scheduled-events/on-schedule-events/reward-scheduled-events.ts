@@ -22,7 +22,7 @@ export class RewardScheduledEvents implements InitializeScheduledEvents {
     handler: onSchedule(
       {
         region: STATIC_CONFIG.region,
-        schedule: 'every day',
+        schedule: '0 0 * * *',
         timeZone: STATIC_CONFIG.timezone,
       },
       async () => {
