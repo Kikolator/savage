@@ -2,23 +2,30 @@ import {logger} from 'firebase-functions';
 
 import {ReferralStatus, ReferrerType} from '../data/enums';
 import {CreateDoc, Referral, ReferralCode} from '../data/models';
-import {AppError, ErrorCode} from '../errors/app-error';
+import {FirestoreServiceError, ReferralServiceError} from '../errors';
 
+import {BaseService} from './base-service';
 import {FirestoreService} from './firestore-service';
 import OfficeRndService from './office-rnd-service';
 import {RewardService} from './reward-service';
 
-export class ReferralService {
+export class ReferralService extends BaseService<ReferralService> {
   private readonly referralCodesCollection = 'referralCodes';
   private readonly referralsCollection = 'referrals';
 
   constructor(
-    private readonly params: {
+    private readonly services: {
       firestoreService: FirestoreService;
       officeRndService: OfficeRndService;
       rewardService: RewardService;
     }
-  ) {}
+  ) {
+    super();
+  }
+
+  protected async performInitialization(): Promise<void> {
+    // No-op for now, but could be used for future setup
+  }
 
   private generateReferralCode(): string {
     // Generate a 6-character code using uppercase letters and numbers
@@ -29,6 +36,7 @@ export class ReferralService {
     }
     return code;
   }
+
   /**
    * Creates a new referral code for a referrer.
    * Creates a doc in firestore.
@@ -42,95 +50,84 @@ export class ReferralService {
     referrerCompanyId: string | null;
     referrerType: ReferrerType;
   }): Promise<ReferralCode> {
-    logger.info([
-      'ReferralService.createReferralCode()- creating referral code',
-      {
-        referrerId: params.referrerId,
-        referrerType: params.referrerType,
-      },
-    ]);
+    this.logMethodEntry('createReferralCode', params);
+    try {
+      await this.ensureInitialized();
+      // Check if referrer has permission to create referral code.
+      // And referral code does not already exist.
+      const officeRndService = this.services.officeRndService;
+      const referrer = await officeRndService.getMember(params.referrerId);
+      if (!referrer.properties.referralPermission) {
+        throw ReferralServiceError.noPermission();
+      }
 
-    // Check if referrer has permission to create referral code.
-    // And referral code does not already exist.
-    const officeRndService = this.params.officeRndService;
-    const referrer = await officeRndService.getMember(params.referrerId);
-    if (!referrer.properties.referralPermission) {
-      throw new AppError(
-        'Referrer does not have permission to create referral code',
-        ErrorCode.REFERRAL_CODE_NO_PERMISSION,
-        400
-      );
-    }
+      if (referrer.properties.referralOwnCode) {
+        throw ReferralServiceError.alreadyExists();
+      }
 
-    if (referrer.properties.referralOwnCode) {
-      throw new AppError(
-        'Referrer already has a referral code',
-        ErrorCode.REFERRAL_CODE_ALREADY_EXISTS,
-        400
-      );
-    }
+      let referralCode: ReferralCode | null = null;
+      let attempts = 0;
+      const maxAttempts = 10; // Prevent infinite loops
 
-    let referralCode: ReferralCode | null = null;
-    let attempts = 0;
-    const maxAttempts = 10; // Prevent infinite loops
+      while (attempts < maxAttempts) {
+        attempts++;
 
-    while (attempts < maxAttempts) {
-      attempts++;
+        // Create new referral code object
+        const candidate = new ReferralCode({
+          documentId: params.referrerId,
+          code: this.generateReferralCode(),
+          ownerId: params.referrerId,
+          companyId: params.referrerCompanyId,
+          ownerType: params.referrerType,
+          totalReferred: 0,
+          totalConverted: 0,
+          totalRewardedEur: 0,
+          referredUsers: [],
+        });
 
-      // Create new referral code object
-      const candidate = new ReferralCode({
-        documentId: params.referrerId,
-        code: this.generateReferralCode(),
-        ownerId: params.referrerId,
-        companyId: params.referrerCompanyId,
-        ownerType: params.referrerType,
-        totalReferred: 0,
-        totalConverted: 0,
-        totalRewardedEur: 0,
-        referredUsers: [],
+        try {
+          // Attempt to create the document in firestore
+          const data: CreateDoc = {
+            collection: this.referralCodesCollection,
+            documentId: candidate.documentId,
+            data: candidate.toDocumentData(),
+          };
+          await this.services.firestoreService.createDocument(data);
+
+          // only assign on succesful write
+          referralCode = candidate;
+          break;
+        } catch (error) {
+          // If document creation fails (likely due to code collision), continue to next attempt
+          logger.warn([
+            'ReferralService.createReferralCode()- code collision detected, retrying',
+            {
+              attempt: attempts,
+              code: candidate.code,
+              error: error,
+            },
+          ]);
+        }
+      }
+
+      // if we failed to generate a unique code, throw an error
+      if (referralCode === null) {
+        throw ReferralServiceError.uniqueCodeFailed();
+      }
+
+      // Add referral code to office rnd member properties
+      await this.services.officeRndService.updateMember(params.referrerId, {
+        referralOwnCode: referralCode.code,
       });
 
-      try {
-        // Attempt to create the document in firestore
-        const data: CreateDoc = {
-          collection: this.referralCodesCollection,
-          documentId: candidate.documentId,
-          data: candidate.toDocumentData(),
-        };
-        await this.params.firestoreService.createDocument(data);
-
-        // only assign on succesful write
-        referralCode = candidate;
-        break;
-      } catch (error) {
-        // If document creation fails (likely due to code collision), continue to next attempt
-        logger.warn([
-          'ReferralService.createReferralCode()- code collision detected, retrying',
-          {
-            attempt: attempts,
-            code: candidate.code,
-            error: error,
-          },
-        ]);
-      }
+      this.logMethodSuccess('createReferralCode', referralCode);
+      // Return referral code object
+      return referralCode;
+    } catch (error) {
+      this.logMethodError('createReferralCode', error as Error);
+      if (error instanceof ReferralServiceError) throw error;
+      throw ReferralServiceError.unknownError((error as Error).message, error);
     }
-
-    // if we failed to generate a unique code, throw an error
-    if (referralCode === null) {
-      throw new AppError(
-        'Failed to generate unique referral code after maximum attempts',
-        ErrorCode.UNKNOWN_ERROR,
-        500
-      );
-    }
-
-    // Add referral code to office rnd member properties
-    await this.params.officeRndService.updateMember(params.referrerId, {
-      referralOwnCode: referralCode.code,
-    });
-
-    // Return referral code object
-    return referralCode;
   }
 
   public async createReferral(params: {
@@ -139,216 +136,217 @@ export class ReferralService {
     referrerCompanyId: string | null;
     isTrialday: boolean;
     trialdayStartDate?: Date;
+    trialDayId?: string;
+    opportunityId?: string;
     membershipStartDate?: Date;
     subscriptionValue?: number;
     referralValue?: number;
   }): Promise<Referral> {
-    const firestoreService = this.params.firestoreService;
-    const officeRndService = this.params.officeRndService;
-    const referralCodesCollection = this.referralCodesCollection;
-    const referralsCollection = this.referralsCollection;
-    const referralCode = params.referralCode.toUpperCase();
-    const referredUserId = params.referredUserId;
-    const isTrialday = params.isTrialday;
-    const trialdayStartDate = params.trialdayStartDate;
-    const membershipStartDate = params.membershipStartDate;
-    const subscriptionValue = params.subscriptionValue;
-    const referralValue = params.referralValue;
+    this.logMethodEntry('createReferral', params);
+    try {
+      await this.ensureInitialized();
+      const firestoreService = this.services.firestoreService;
+      const officeRndService = this.services.officeRndService;
+      const referralCodesCollection = this.referralCodesCollection;
+      const referralsCollection = this.referralsCollection;
+      const referralCode = params.referralCode.toUpperCase();
+      const referredUserId = params.referredUserId;
+      const isTrialday = params.isTrialday;
+      const trialdayStartDate = params.trialdayStartDate;
+      const trialDayId = params.trialDayId;
+      const opportunityId = params.opportunityId;
+      const membershipStartDate = params.membershipStartDate;
+      const subscriptionValue = params.subscriptionValue;
+      const referralValue = params.referralValue;
 
-    logger.info([
-      'ReferralService.createReferral()- creating referral',
-      {
-        referralCode: referralCode,
-        referredUserId: referredUserId,
-      },
-    ]);
-
-    // If trial day, trial start date cannot be undefined.
-    // If not trial day, trialdayStartDate must be undefined, and
-    // membershipStartDate, subscriptionValue, and referralValue must be defined.
-    if (isTrialday) {
-      if (!trialdayStartDate) {
-        throw new AppError(
-          'Trial day start date is required when creating a trial day referral',
-          ErrorCode.INVALID_ARGUMENT,
-          400
-        );
-      }
-      if (membershipStartDate) {
-        throw new AppError(
-          'Membership start date must be undefined when creating a trial day referral',
-          ErrorCode.INVALID_ARGUMENT,
-          400
-        );
-      }
-      if (subscriptionValue) {
-        throw new AppError(
-          'Subscription value must be undefined when creating a trial day referral',
-          ErrorCode.INVALID_ARGUMENT,
-          400
-        );
-      }
-      if (referralValue) {
-        throw new AppError(
-          'Referral value must be undefined when creating a trial day referral',
-          ErrorCode.INVALID_ARGUMENT,
-          400
-        );
-      }
-    } else {
-      if (trialdayStartDate) {
-        throw new AppError(
-          'Trial day start date must be undefined when creating a membership referral',
-          ErrorCode.INVALID_ARGUMENT,
-          400
-        );
-      }
-      if (!membershipStartDate) {
-        throw new AppError(
-          'Membership start date is required when creating a membership referral',
-          ErrorCode.INVALID_ARGUMENT,
-          400
-        );
-      }
-      if (!subscriptionValue) {
-        throw new AppError(
-          'Subscription value is required when creating a membership referral',
-          ErrorCode.INVALID_ARGUMENT,
-          400
-        );
-      }
-      if (!referralValue) {
-        throw new AppError(
-          'Referral value is required when creating a membership referral',
-          ErrorCode.INVALID_ARGUMENT,
-          400
-        );
-      }
-    }
-
-    // Use transaction to ensure atomicity and prevent data races
-    const referral = await firestoreService.runTransaction(
-      async (transaction) => {
-        // Get the referral code object from firestore within the transaction
-        const referralCodeDocQuery = firestoreService
-          .getFirestoreInstance()
-          .collection(referralCodesCollection)
-          .where('code', '==', referralCode);
-        const referralCodeSnapshot =
-          await transaction.get(referralCodeDocQuery);
-
-        if (referralCodeSnapshot.empty) {
-          throw new AppError(
-            'Referral code query is empty',
-            ErrorCode.DOCUMENT_NOT_FOUND,
-            404
+      // If trial day, trial start date, trial day id, and opportunity id are required.
+      // If not trial day, membership start date, subscription value, and referral value are required.
+      if (isTrialday) {
+        if (!trialdayStartDate) {
+          throw ReferralServiceError.invalidArgument(
+            'Trial day start date is required when creating a trial day referral'
           );
         }
-        const referralCodeDoc = referralCodeSnapshot.docs[0];
-        const referralCodeData = referralCodeDoc.data();
-        if (!referralCodeData) {
-          throw new AppError(
-            'Referral code data is undefined',
-            ErrorCode.INVALID_ARGUMENT,
-            400
+        if (!trialDayId) {
+          throw ReferralServiceError.invalidArgument(
+            'Trial day id is required when creating a trial day referral'
           );
         }
-        const referralCodeObject = ReferralCode.fromDocumentData(
-          referralCodeDoc.id,
-          referralCodeData
-        );
-
-        // Check if referred user is already referred with this code
-        if (referralCodeObject.referredUsers.includes(referredUserId)) {
-          throw new AppError(
-            'User already referred with this code',
-            ErrorCode.INVALID_ARGUMENT,
-            400
+        if (!opportunityId) {
+          throw ReferralServiceError.invalidArgument(
+            'Opportunity id is required when creating a trial day referral'
           );
         }
-
-        // Check if referred user is the referrer.
-        if (referredUserId === referralCodeObject.ownerId) {
-          throw new AppError(
-            'Referrer cannot be the same as the referred user',
-            ErrorCode.INVALID_ARGUMENT,
-            400
+        if (membershipStartDate) {
+          throw ReferralServiceError.invalidArgument(
+            'Membership start date must be undefined when creating a trial day referral'
           );
         }
+        if (subscriptionValue) {
+          throw ReferralServiceError.invalidArgument(
+            'Subscription value must be undefined when creating a trial day referral'
+          );
+        }
+        if (referralValue) {
+          throw ReferralServiceError.invalidArgument(
+            'Referral value must be undefined when creating a trial day referral'
+          );
+        }
+      } else {
+        if (trialdayStartDate) {
+          throw ReferralServiceError.invalidArgument(
+            'Trial day start date must be undefined when creating a membership referral'
+          );
+        }
+        if (trialDayId) {
+          throw ReferralServiceError.invalidArgument(
+            'Trial day id must be undefined when creating a membership referral'
+          );
+        }
+        if (opportunityId) {
+          throw ReferralServiceError.invalidArgument(
+            'Opportunity id must be undefined when creating a membership referral'
+          );
+        }
+        if (!membershipStartDate) {
+          throw ReferralServiceError.invalidArgument(
+            'Membership start date is required when creating a membership referral'
+          );
+        }
+        if (!subscriptionValue) {
+          throw ReferralServiceError.invalidArgument(
+            'Subscription value is required when creating a membership referral'
+          );
+        }
+        if (!referralValue) {
+          throw ReferralServiceError.invalidArgument(
+            'Referral value is required when creating a membership referral'
+          );
+        }
+      }
 
-        // Check if referred user is already referred with another code.
-        const referralsQuery = await firestoreService.queryCollection(
-          referralsCollection,
-          [
+      // Use transaction to ensure atomicity and prevent data races
+      const referral = await firestoreService.runTransaction(
+        async (transaction) => {
+          // Get the referral code object from firestore within the transaction
+          const referralCodeSnapshot =
+            await firestoreService.queryCollectionWithTransaction(
+              transaction,
+              referralCodesCollection,
+              [
+                {
+                  field: 'code',
+                  operator: '==',
+                  value: referralCode,
+                },
+              ]
+            );
+
+          if (referralCodeSnapshot.empty) {
+            throw ReferralServiceError.referralCodeNotFound(referralCode);
+          }
+          const referralCodeDoc = referralCodeSnapshot.docs[0];
+          const referralCodeData = referralCodeDoc.data();
+          if (!referralCodeData) {
+            throw ReferralServiceError.dataUndefined(
+              'Referral code data is undefined'
+            );
+          }
+          const referralCodeObject = ReferralCode.fromDocumentData(
+            referralCodeDoc.id,
+            referralCodeData
+          );
+
+          // Check if referred user is already referred with this code
+          if (referralCodeObject.referredUsers.includes(referredUserId)) {
+            throw ReferralServiceError.alreadyReferred();
+          }
+
+          // Check if referred user is the referrer.
+          if (referredUserId === referralCodeObject.ownerId) {
+            throw ReferralServiceError.selfReferral();
+          }
+
+          // Check if referred user is already referred with another code.
+          const referralsQuery = await firestoreService.queryCollection(
+            referralsCollection,
+            [
+              {
+                field: 'referredUserId',
+                operator: '==',
+                value: referredUserId,
+              },
+            ]
+          );
+          if (referralsQuery.length > 0) {
+            throw ReferralServiceError.alreadyReferredOther(
+              referralsQuery[0].referralCode
+            );
+          }
+
+          // Create a new document reference for the referral
+          const referralDocRef =
+            firestoreService.createDocumentReference(referralsCollection);
+
+          // Create referral object
+          const referral = new Referral({
+            id: referralDocRef.id,
+            referrerId: referralCodeObject.ownerId,
+            referrerCompanyId: referralCodeObject.companyId || null,
+            referrerType: referralCodeObject.ownerType,
+            referredUserId: referredUserId,
+            referralCode: referralCode,
+            trialStartDate: trialdayStartDate || null,
+            trialDayId: trialDayId || null,
+            opportunityId: opportunityId || null,
+            membershipStartDate: membershipStartDate || null,
+            subscriptionValue: subscriptionValue || null,
+            referralValue: referralValue || null,
+            status: isTrialday
+              ? ReferralStatus.TRIAL
+              : ReferralStatus.AWAITING_PAYMENT,
+            rewardIds: [],
+          });
+
+          // Add referral object to firestore within the transaction
+          firestoreService.setDocumentWithTransaction(
+            transaction,
+            referralsCollection,
+            referralDocRef.id,
             {
-              field: 'referredUserId',
-              operator: '==',
-              value: referredUserId,
-            },
-          ]
-        );
-        if (referralsQuery.length > 0) {
-          throw new AppError(
-            'User already referred with another code',
-            ErrorCode.INVALID_ARGUMENT,
-            400,
-            {referralCode: referralsQuery[0].referralCode}
+              ...referral.toDocumentData(),
+              created_at: firestoreService.getServerTimestamp(),
+            }
           );
+
+          // Update referral code object within the transaction using FieldValue operations
+          // Use increment for totalReferred and arrayUnion for referredUsers
+          firestoreService.updateDocumentWithTransaction(
+            transaction,
+            referralCodesCollection,
+            referralCodeDoc.id,
+            {
+              totalReferred: firestoreService.increment(1),
+              referredUsers: firestoreService.arrayUnion(referredUserId),
+            }
+          );
+
+          return referral;
         }
+      );
 
-        // Create a new document reference for the referral
-        const referralDocRef =
-          firestoreService.createReference(referralsCollection);
+      // Update OfficeRnd outside of the transaction since it's not part of Firestore
+      await officeRndService.updateMember(referral.referredUserId, {
+        referralCodeUsed: referralCode,
+      });
 
-        // Create referral object
-        const referral = new Referral({
-          id: referralDocRef.id,
-          referrerId: referralCodeObject.ownerId,
-          referrerCompanyId: referralCodeObject.companyId || null,
-          referrerType: referralCodeObject.ownerType,
-          referredUserId: referredUserId,
-          referralCode: referralCode,
-          trialStartDate: trialdayStartDate || null,
-          membershipStartDate: membershipStartDate || null,
-          subscriptionValue: subscriptionValue || null,
-          referralValue: referralValue || null,
-          status: isTrialday
-            ? ReferralStatus.TRIAL
-            : ReferralStatus.AWAITING_PAYMENT,
-          rewardIds: [],
-        });
-
-        // Add referral object to firestore within the transaction
-        transaction.set(referralDocRef, {
-          ...referral.toDocumentData(),
-          created_at: firestoreService.getFieldValue().serverTimestamp(),
-          updated_at: firestoreService.getFieldValue().serverTimestamp(),
-        });
-
-        // Update referral code object within the transaction using FieldValue operations
-        // Use increment for totalReferred and arrayUnion for referredUsers
-        const referralCodeDocRef = firestoreService
-          .getFirestoreInstance()
-          .collection(referralCodesCollection)
-          .doc(referralCodeDoc.id);
-        transaction.update(referralCodeDocRef, {
-          totalReferred: firestoreService.getFieldValue().increment(1),
-          referredUsers: firestoreService
-            .getFieldValue()
-            .arrayUnion(referredUserId),
-          updated_at: firestoreService.getFieldValue().serverTimestamp(),
-        });
-
-        return referral;
-      }
-    );
-
-    // Update OfficeRnd outside of the transaction since it's not part of Firestore
-    await officeRndService.updateMember(referral.referredUserId, {
-      referralCodeUsed: referralCode,
-    });
-
-    return referral;
+      this.logMethodSuccess('createReferral', referral);
+      return referral;
+    } catch (error) {
+      this.logMethodError('createReferral', error as Error);
+      if (error instanceof ReferralServiceError) throw error;
+      throw ReferralServiceError.unknownError((error as Error).message, error);
+    }
   }
 
   /**
@@ -361,105 +359,105 @@ export class ReferralService {
   public async confirmConversion(params: {
     referralId: string;
   }): Promise<Referral> {
-    const firestoreService = this.params.firestoreService;
-    const referralsCollection = this.referralsCollection;
-    const rewardService = this.params.rewardService;
-    const referralCodesCollection = this.referralCodesCollection;
+    this.logMethodEntry('confirmConversion', params);
+    try {
+      await this.ensureInitialized();
+      const firestoreService = this.services.firestoreService;
+      const referralsCollection = this.referralsCollection;
+      const rewardService = this.services.rewardService;
+      const referralCodesCollection = this.referralCodesCollection;
 
-    logger.info([
-      'ReferralService.confirmConversion()- confirming conversion',
-      {referralId: params.referralId},
-    ]);
-
-    // Run transaction for atomic consistency.
-    const updatedReferral = await firestoreService.runTransaction(
-      async (transaction) => {
-        // Fetch referral doc
-        const referralDocRef = firestoreService
-          .getFirestoreInstance()
-          .collection(referralsCollection)
-          .doc(params.referralId);
-
-        const referralDoc = await transaction.get(referralDocRef);
-        if (!referralDoc.exists) {
-          throw new AppError(
-            'Referral not found',
-            ErrorCode.DOCUMENT_NOT_FOUND,
-            404
+      // Run transaction for atomic consistency.
+      const updatedReferral = await firestoreService.runTransaction(
+        async (transaction) => {
+          // Fetch referral doc
+          const referralDoc = await firestoreService.getDocumentWithTransaction(
+            transaction,
+            referralsCollection,
+            params.referralId
           );
-        }
-        const referralData = referralDoc.data();
-        if (!referralData) {
-          throw new AppError(
-            'Referral data is undefined',
-            ErrorCode.INVALID_ARGUMENT,
-            400
+          if (!referralDoc.exists) {
+            throw FirestoreServiceError.documentNotFound(
+              'referrals',
+              params.referralId
+            );
+          }
+          const referralData = referralDoc.data();
+          if (!referralData) {
+            throw ReferralServiceError.dataUndefined(
+              'Referral data is undefined'
+            );
+          }
+
+          const referralObj = Referral.fromDocumentData(
+            referralDoc.id,
+            referralData
           );
-        }
 
-        const referralObj = Referral.fromDocumentData(
-          referralDoc.id,
-          referralData
-        );
+          // Only referrals awaiting payment can be converted
+          if (referralObj.status !== ReferralStatus.AWAITING_PAYMENT) {
+            throw ReferralServiceError.notEligibleForConversion(
+              referralObj.status
+            );
+          }
 
-        // Only referrals awaiting payment can be converted
-        if (referralObj.status !== ReferralStatus.AWAITING_PAYMENT) {
-          throw new AppError(
-            'Referral not eligible for conversion',
-            ErrorCode.INVALID_ARGUMENT,
-            400,
-            {currentStatus: referralObj.status}
+          // Update referral fields
+          referralObj.status = ReferralStatus.CONVERTED;
+
+          firestoreService.updateDocumentWithTransaction(
+            transaction,
+            referralsCollection,
+            params.referralId,
+            {
+              status: referralObj.status,
+            }
           );
+
+          // Increment totalConverted on the parent referral code
+          firestoreService.updateDocumentWithTransaction(
+            transaction,
+            referralCodesCollection,
+            referralObj.referralCode,
+            {
+              totalConverted: firestoreService.increment(1),
+            }
+          );
+
+          return referralObj;
         }
+      );
 
-        // Update referral fields
-        referralObj.status = ReferralStatus.CONVERTED;
+      // Create rewards now that conversion is committed
+      const rewards =
+        await rewardService.createRewardsForConversion(updatedReferral);
 
-        transaction.update(referralDocRef, {
-          status: referralObj.status,
-          updated_at: firestoreService.getFieldValue().serverTimestamp(),
+      // Link reward IDs back to referral document
+      if (rewards.length) {
+        await firestoreService.updateDocument({
+          collection: referralsCollection,
+          documentId: updatedReferral.id,
+          data: {rewardIds: rewards.map((r) => r.id)},
         });
-
-        // Increment totalConverted on the parent referral code
-        const codeDocRef = firestoreService
-          .getFirestoreInstance()
-          .collection(referralCodesCollection)
-          .doc(referralObj.referralCode);
-
-        transaction.update(codeDocRef, {
-          totalConverted: firestoreService.getFieldValue().increment(1),
-          updated_at: firestoreService.getFieldValue().serverTimestamp(),
-        });
-
-        return referralObj;
       }
-    );
 
-    // Create rewards now that conversion is committed
-    const rewards =
-      await rewardService.createRewardsForConversion(updatedReferral);
+      // ─────────────────────────────────────────────────────────────
+      // Reward payout can be triggered here (invoice credit, etc.).
+      // Leaving placeholder for subsequent implementation.
+      // ─────────────────────────────────────────────────────────────
+      logger.info([
+        'ReferralService.confirmConversion()- reward now payable',
+        {
+          referralId: updatedReferral.id,
+          referrerId: updatedReferral.referrerId,
+        },
+      ]);
 
-    // Link reward IDs back to referral document
-    if (rewards.length) {
-      await firestoreService.updateDocument({
-        collection: referralsCollection,
-        documentId: updatedReferral.id,
-        data: {rewardIds: rewards.map((r) => r.id)},
-      });
+      this.logMethodSuccess('confirmConversion', updatedReferral);
+      return updatedReferral;
+    } catch (error) {
+      this.logMethodError('confirmConversion', error as Error);
+      if (error instanceof ReferralServiceError) throw error;
+      throw ReferralServiceError.unknownError((error as Error).message, error);
     }
-
-    // ─────────────────────────────────────────────────────────────
-    // Reward payout can be triggered here (invoice credit, etc.).
-    // Leaving placeholder for subsequent implementation.
-    // ─────────────────────────────────────────────────────────────
-    logger.info([
-      'ReferralService.confirmConversion()- reward now payable',
-      {
-        referralId: updatedReferral.id,
-        referrerId: updatedReferral.referrerId,
-      },
-    ]);
-
-    return updatedReferral;
   }
 }

@@ -5,7 +5,7 @@ class Env {
 
   static const String kLocalhost = 'localhost';
 
-  static const int kLocalFirestorePort = 8081;
+  static const int kLocalFirestorePort = 8085;
 
   static int kLocalCloudFunctionsPort = 5010;
   //

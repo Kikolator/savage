@@ -1,113 +1,125 @@
 import * as crypto from 'crypto';
 
-import {RequestHandler} from 'express';
-import {logger} from 'firebase-functions';
+import {Request, Response, NextFunction} from 'express';
 
-import {Controller, HttpServer} from '..';
-// import { FirestoreService } from '../../../core/services/firestore-service';
-import {TYPEFORM_IDS} from '../../../core/config/typeform-ids';
-import {firebaseSecrets} from '../../../core/config/firebase-secrets';
+import {BaseController} from '../base-controller';
+import {HttpServer} from '..';
+import {TypeformControllerError} from '../../../core/errors/api/typeform-controller-error';
+import {getConfig, STATIC_CONFIG} from '../../../core/config';
 import {TrialDayFormData, TypeformResponse} from '../../../core/data/models';
 import {TrialdayService} from '../../../core/services/trialday-service';
-import {AppError, ErrorCode} from '../../../core/errors/app-error';
 import {isDevelopment} from '../../../core/utils/environment';
 
 import {parseTypeformResponse} from './typeform-parser';
 
-class TypeformController implements Controller {
+class TypeformController extends BaseController {
   private static readonly formHandlers: Map<
     string,
     (data: TypeformResponse) => Promise<void>
   > = new Map();
+  private config: ReturnType<typeof getConfig>['runtime'] | null = null;
 
   constructor(
     private readonly params: {
       trialdayService: TrialdayService;
     }
   ) {
+    super();
+
+    // Defer config access until first use to avoid deployment issues
+
     // Bind the handlers in the constructor
     TypeformController.formHandlers.set(
-      TYPEFORM_IDS.TRIAL_DAY,
+      STATIC_CONFIG.typeform.ids.trialDay,
       this.handleTrialDayForm.bind(this)
     );
   }
 
-  initialize(httpServer: HttpServer): void {
-    httpServer.post('/webhook/typeform', this.handleWebhook.bind(this));
+  /**
+   * Get the runtime config, initializing it if needed
+   */
+  private getRuntimeConfig(): ReturnType<typeof getConfig>['runtime'] {
+    if (!this.config) {
+      const appConfig = getConfig();
+      this.config = appConfig.runtime;
+    }
+    return this.config;
   }
 
-  private handleWebhook: RequestHandler = async (request, response, next) => {
-    logger.info('TypeformController.handleWebhook: handling typeform webhook');
+  initialize(httpServer: HttpServer): void {
+    httpServer.post(
+      '/webhook/typeform',
+      this.createHandler(this.handleWebhook.bind(this))
+    );
+  }
+
+  private async handleWebhook(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    this.logInfo('handling typeform webhook');
 
     // If in emulator mode, skip the signature verification
     if (isDevelopment()) {
-      logger.info(
-        'TypeformController.handleWebhook: skipping signature verification in emulator mode'
-      );
+      this.logInfo('skipping signature verification in emulator mode');
     } else {
-      this.verifyTypeformSignature(request.typeformSignature, request.rawBody);
+      this.verifyTypeformSignature(req.typeformSignature, req.rawBody);
     }
 
-    // // First verify the typeform signature to ensure the request is legitimate
-    // this.verifyTypeformSignature(
-    //   request.typeformSignature,
-    //   request.rawBody
-    // );
+    const typeformData = req.body as TypeformResponse;
 
-    const typeformData = request.body as TypeformResponse;
-
-    // validate data
+    // Validate data
     if (!typeformData.form_response?.form_id) {
-      throw new AppError(
-        'Invalid Typeform webhook data',
-        ErrorCode.TYPEFORM_WEBHOOK_INVALID_DATA
-      );
+      throw TypeformControllerError.invalidData('handleWebhook');
     }
 
-    // get the handler for the form
+    // Get the handler for the form
     const formId = typeformData.form_response.form_id;
     const formHandler = TypeformController.formHandlers.get(formId);
 
     // Send 200 OK response to Typeform first
-    response.status(200).send('OK');
+    res.status(200).send('OK');
 
     if (!formHandler) {
       // Log error internally but don't throw
-      logger.error(
-        'TypeformController.handleWebhook()- No handler found for form',
-        {
-          formId,
-          eventId: typeformData.event_id,
-        }
-      );
+      this.logError('No handler found for form', undefined, {
+        formId,
+        eventId: typeformData.event_id,
+      });
       // TODO add error to database
       return;
     }
 
-    // process the form response
+    // Process the form response
     formHandler(typeformData).catch((error) => {
-      logger.error('TypeformController.handleWebhook: error processing form', {
-        error,
+      this.logError('Error processing form', error, {
         formId: typeformData.form_response.form_id,
         eventId: typeformData.event_id,
       });
       next(error);
     });
-    next();
-  };
+  }
 
   private async handleTrialDayForm(data: TypeformResponse): Promise<void> {
-    logger.info(
-      'TypeformController.handleTrialDayForm: handling trial day form',
-      {eventId: data.event_id}
-    );
-    // parse the form data
-    const formData = parseTypeformResponse<TrialDayFormData>(
-      data,
-      TYPEFORM_IDS.TRIAL_DAY
-    );
+    this.logInfo('handling trial day form', {eventId: data.event_id});
 
-    await this.params.trialdayService.handleTrialdayRequest(formData);
+    try {
+      // Parse the form data
+      const formData = parseTypeformResponse<TrialDayFormData>(
+        data,
+        STATIC_CONFIG.typeform.ids.trialDay
+      );
+
+      await this.params.trialdayService.handleTrialdayRequest(formData);
+    } catch (error) {
+      throw TypeformControllerError.formProcessingFailed(
+        'handleTrialDayForm',
+        data.form_response.form_id,
+        data.event_id,
+        error instanceof Error ? error : undefined
+      );
+    }
   }
 
   private verifyTypeformSignature(
@@ -115,30 +127,29 @@ class TypeformController implements Controller {
     payload: Buffer | undefined
   ): void {
     if (!receivedSignature) {
-      throw new AppError(
-        'No signature found in request',
-        ErrorCode.TYPEFORM_WEBHOOK_INVALID_SIGNATURE,
-        401
+      throw TypeformControllerError.invalidSignature(
+        'verifyTypeformSignature',
+        {
+          reason: 'No signature found in request',
+        }
       );
     }
+
     if (!payload) {
-      throw new AppError(
-        'No payload found in request, check the rawBodySaver middleware',
-        ErrorCode.TYPEFORM_WEBHOOK_NO_RAW_BODY,
-        401
-      );
+      throw TypeformControllerError.noRawBody('verifyTypeformSignature');
     }
-    const secret = firebaseSecrets.typeformSecretKey.value();
+
+    const secret = this.getRuntimeConfig().typeform.secretKey;
+
     // Create HMAC and update with raw buffer
     const hmac = crypto.createHmac('sha256', secret);
     hmac.update(payload);
     const hash = hmac.digest('base64');
     const expectedSignature = `sha256=${hash}`;
+
     if (receivedSignature !== expectedSignature) {
-      throw new AppError(
-        'invalid signature',
-        ErrorCode.TYPEFORM_WEBHOOK_INVALID_SIGNATURE,
-        401,
+      throw TypeformControllerError.invalidSignature(
+        'verifyTypeformSignature',
         {
           receivedSignature,
           expectedSignature,
@@ -148,7 +159,6 @@ class TypeformController implements Controller {
         }
       );
     }
-    return;
   }
 }
 

@@ -7,6 +7,8 @@ export interface Controller {
   initialize(httpServer: HttpServer): void;
 }
 
+export * from './base-controller';
+
 export class HttpServer {
   private router: Router;
 
@@ -30,6 +32,10 @@ export class HttpServer {
     this.router.delete(path, this._catchErrorHandler(requestHandler));
   }
 
+  options(path: string, requestHandler: RequestHandler): void {
+    this.router.options(path, requestHandler);
+  }
+
   //   createdVersionedRouter;
   // This allows us to create a new router for a specific version
   createdVersionedRouter(version: string): Router {
@@ -49,13 +55,37 @@ export class HttpServer {
       try {
         await requestHandler(req, res, next);
       } catch (error: unknown) {
-        logger.error('HttpServer._catchErrorHandler()-', error);
+        logger.error('HttpServer._catchErrorHandler(): unhandled error', {
+          error: error instanceof Error ? error.message : error,
+          stack: error instanceof Error ? error.stack : undefined,
+          path: req.path,
+          method: req.method,
+        });
+
         if (error instanceof AppError) {
-          res.status(error.status || 500).json({message: error.message});
+          // Use the safe JSON representation for client responses
+          const errorResponse = error.toSafeJSON();
+          // Add code if it exists on the error
+          if ('code' in error) {
+            errorResponse.code = (error as any).code;
+          }
+          res.status(error.status || 500).json(errorResponse);
         } else if (error instanceof Error) {
-          res.status(500).json({message: error.message});
+          res.status(500).json({
+            name: 'InternalServerError',
+            message: error.message,
+            code: 1000, // UNKNOWN_ERROR
+            status: 500,
+            timestamp: new Date().toISOString(),
+          });
         } else {
-          res.status(500).json({message: 'Internal Server Error'});
+          res.status(500).json({
+            name: 'InternalServerError',
+            message: 'Internal Server Error',
+            code: 1000, // UNKNOWN_ERROR
+            status: 500,
+            timestamp: new Date().toISOString(),
+          });
         }
       }
     };

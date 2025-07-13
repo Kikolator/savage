@@ -6,15 +6,15 @@ import {
   CallableV2Function,
   InitializeCallableFunctions,
 } from '../initialize-callable-functions';
-import {mainConfig} from '../../core/config/main-config';
+import {STATIC_CONFIG} from '../../core/config';
 import {CreateReferralCodeCallData} from '../../core/data/models/referral-code/create-referral-code-call-data';
-import {FirestoreService} from '../../core/services/firestore-service';
-import OfficeRndService from '../../core/services/office-rnd-service';
-import {RewardService} from '../../core/services/reward-service';
-import {ReferralService} from '../../core/services/referral-service';
-import {BankPayoutService} from '../../core/services/bank-payout-service';
+import {ServiceResolver} from '../../core/services/di';
 import {ReferrerType} from '../../core/data/enums';
-import {AppError, ErrorCode} from '../../core/errors/app-error';
+import {AppError} from '../../core/errors/app-error';
+import {
+  ReferralServiceError,
+  ReferralServiceErrorCode,
+} from '../../core/errors/services/referral-service-error';
 
 export class ReferralFunctions implements InitializeCallableFunctions {
   initialize(add: AddCallableFunction): void {
@@ -25,9 +25,13 @@ export class ReferralFunctions implements InitializeCallableFunctions {
     name: 'createReferralCode',
     handler: onCall(
       {
-        region: mainConfig.cloudFunctionsLocation,
+        region: STATIC_CONFIG.region,
         // TODO update cors settings for production.
-        cors: ['http://localhost:*', 'https://localhost:*'],
+        cors: [
+          'http://localhost:*',
+          'https://localhost:*',
+          'https://*.savage-coworking.com*',
+        ],
       },
       async (request) => {
         try {
@@ -36,19 +40,7 @@ export class ReferralFunctions implements InitializeCallableFunctions {
           const data = request.data as CreateReferralCodeCallData;
 
           // 2. Create referral code.
-          const referralService = new ReferralService({
-            firestoreService: FirestoreService.getInstance(),
-            officeRndService: new OfficeRndService({
-              firestoreService: FirestoreService.getInstance(),
-            }),
-            rewardService: new RewardService(
-              FirestoreService.getInstance(),
-              new OfficeRndService({
-                firestoreService: FirestoreService.getInstance(),
-              }),
-              new BankPayoutService()
-            ),
-          });
+          const referralService = ServiceResolver.getReferralService();
           const referralCode = await referralService.createReferralCode({
             referrerId: data.memberId,
             referrerCompanyId: data.companyId,
@@ -58,14 +50,16 @@ export class ReferralFunctions implements InitializeCallableFunctions {
           return referralCode;
         } catch (error) {
           logger.error('Error creating referral code', error);
-          if (error instanceof AppError) {
-            if (error.code === ErrorCode.REFERRAL_CODE_ALREADY_EXISTS) {
+          if (error instanceof ReferralServiceError) {
+            if (error.serviceCode === ReferralServiceErrorCode.ALREADY_EXISTS) {
               throw new HttpsError(
                 'already-exists',
                 'Referral code already exists ' +
                   'for the user, so you cannot create a new one.'
               );
-            } else if (error.code === ErrorCode.REFERRAL_CODE_NO_PERMISSION) {
+            } else if (
+              error.serviceCode === ReferralServiceErrorCode.NO_PERMISSION
+            ) {
               throw new HttpsError(
                 'permission-denied',
                 'User does not have permission to create a referral code.'
@@ -78,6 +72,12 @@ export class ReferralFunctions implements InitializeCallableFunctions {
                   ` Code: ${error.code}`
               );
             }
+          } else if (error instanceof AppError) {
+            throw new HttpsError(
+              'unknown',
+              'Error creating referral code',
+              `Error creating referral code: ${error.message}`
+            );
           } else {
             throw new HttpsError(
               'unknown',

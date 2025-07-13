@@ -1,4 +1,4 @@
-import {TYPEFORM_IDS} from '../../../core/config/typeform-ids';
+import {STATIC_CONFIG} from '../../../core/config';
 import {TrialDayFormData} from '../../../core/data/models';
 
 // Define a union type of all possible form types
@@ -14,7 +14,7 @@ interface TypeformMapping<T extends TypeformTypes> {
 
 const typeformMappings: TypeformMapping<TypeformTypes>[] = [
   {
-    formId: TYPEFORM_IDS.TRIAL_DAY,
+    formId: STATIC_CONFIG.typeform.ids.trialDay,
     formType: {} as TrialDayFormData,
     submittedAt: 'none',
     fieldMappings: {
