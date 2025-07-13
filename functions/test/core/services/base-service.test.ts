@@ -167,7 +167,7 @@ describe('BaseService', () => {
       const service = new TestServiceWithDeps(mockDeps);
 
       await expect(service.testMissingDependency()).rejects.toThrow(
-        "Dependency 'missing' not found in TestServiceWithDeps"
+        'Dependency "missing" not found in TestServiceWithDeps'
       );
     });
 
