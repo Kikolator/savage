@@ -6,18 +6,8 @@ A comprehensive platform that connects various services and platforms to streaml
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/Kikolator/savage.git
 cd savage
-
-# Install dependencies
-npm install
-
-# Set up environment variables
-cp .env.example .env
-# Edit .env with your configuration
-
-# Start development servers
-npm run dev
 ```
 
 ## 📋 Prerequisites
